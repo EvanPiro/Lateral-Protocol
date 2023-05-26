@@ -1,6 +1,6 @@
 # Simple Stable
 
-Simple CDP Contract
+Simple CDP-backed stablecoin
 
 ## Testing
 Enter the dev shell via
