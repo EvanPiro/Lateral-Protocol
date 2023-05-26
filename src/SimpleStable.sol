@@ -27,7 +27,7 @@ contract Notary is Ownable {
         _;
     }
 
-    constructor(uint256 _minRatio, address _priceFeedAddress) public {
+    constructor(uint256 _minRatio, address _priceFeedAddress) {
         minRatio = _minRatio;
         priceFeedAddress = _priceFeedAddress;
     }
@@ -69,7 +69,7 @@ contract Position is Ownable {
     uint256 debt;
     bool isInsolvent;
 
-    constructor(uint256 _minRatio, address _priceFeedAddress, address _coinAddress, address _owner) public {
+    constructor(uint256 _minRatio, address _priceFeedAddress, address _coinAddress, address _owner) {
         minRatio = _minRatio;
         priceFeed = PriceFeed(_priceFeedAddress);
         coin = Coin(_coinAddress);
@@ -82,16 +82,19 @@ contract Position is Ownable {
      * @dev Returns true if the contract's debt position can increase by a specified amount.
      */
     function canTake(uint256 _moreDebt) public returns (bool) {
-        uint256 col = address(this).balance;
+        require(_moreDebt > 0, "Cannot take 0");
+        uint256 collateral = address(this).balance;
         uint256 price = priceFeed.price();
-        return ((col * price) / (debt + _moreDebt)) >= minRatio;
+        uint256 collateralInCoins = price * collateral;
+        uint256 debtInCoins = debt + _moreDebt;
+        return (collateralInCoins * 100 / debtInCoins) >= minRatio;
     }
 
     /**
      * @dev Takes out loan against collateral if the vault is solvent
      */
     function take(address _receiver, uint256 _moreDebt) public onlyOwner {
-        require(canTake(_moreDebt), "Position cannot take more debt");
+        require(canTake(_moreDebt), "Position cannot take debt");
         coin.mint(address(this), _receiver, _moreDebt);
         debt = debt + _moreDebt;
     }

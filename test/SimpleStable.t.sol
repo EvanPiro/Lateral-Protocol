@@ -35,12 +35,11 @@ contract MockAggregatorV3Interface is AggregatorV3Interface {
 }
 
 contract SimpleStable is Test {
-    uint256 minRatio;
+    uint256 minRatio = 150;
     AggregatorV3Interface aggregator;
     Notary notary;
     PriceFeed priceFeed;
     Coin coin;
-
     address owner = address(2);
 
     function setUp() public {
@@ -55,5 +54,16 @@ contract SimpleStable is Test {
         address positionAddress = notary.openPosition(owner);
         Position position = Position(positionAddress);
         assertEq(position.minRatio(), minRatio);
+    }
+
+    function test_CannotTakeDebtBelowMinimumRatio() public {
+        vm.startPrank(owner);
+        address positionAddress = notary.openPosition(owner);
+        Position position = Position(positionAddress);
+
+        vm.expectRevert("Position cannot take debt");
+        position.take(owner, 100000000);
+        console.log(coin.balanceOf(owner));
+        vm.stopPrank();
     }
 }
