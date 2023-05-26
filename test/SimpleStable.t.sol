@@ -30,7 +30,7 @@ contract MockAggregatorV3Interface is AggregatorV3Interface {
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
-        return (0, 0, 0, 0, 0);
+        return (0, 1, 0, 0, 0);
     }
 }
 
@@ -63,7 +63,21 @@ contract SimpleStable is Test {
 
         vm.expectRevert("Position cannot take debt");
         position.take(owner, 1);
-        console.log(coin.balanceOf(owner));
         vm.stopPrank();
+    }
+
+    function test_CanTakeDebtAboveMinimumRatio() public {
+        priceFeed.refreshPrice();
+
+        vm.startPrank(owner);
+        address positionAddress = notary.openPosition(owner);
+        Position position = Position(positionAddress);
+
+        vm.deal(positionAddress, 10 ** 18);
+
+        position.take(owner, 1);
+        vm.stopPrank();
+
+        assertEq(coin.balanceOf(owner), 1);
     }
 }

@@ -70,6 +70,7 @@ contract Position is Ownable {
     bool isInsolvent;
 
     constructor(uint256 _minRatio, address _priceFeedAddress, address _coinAddress, address _owner) {
+        require(_minRatio > 0, "Minimum collatoralization ratio must be above 0");
         minRatio = _minRatio;
         priceFeed = PriceFeed(_priceFeedAddress);
         coin = Coin(_coinAddress);
