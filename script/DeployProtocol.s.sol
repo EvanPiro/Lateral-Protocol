@@ -2,8 +2,6 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import "../src/NFTPrinter.sol";
-import "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract DeployProtocol is Script {
     function run() external {
