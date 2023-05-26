@@ -98,14 +98,13 @@ contract Position is Ownable {
     /**
      * @dev Liquidates vault if priceId points to a price record of insolvency.
      */
-    function liquidate(uint priceId) public {
+    function liquidate(uint256 priceId) public {
         uint256 _price = priceFeed.price();
         uint256 _col = address(this).balance;
         uint256 cRatio = (_col * _price) / debt;
         require(cRatio < minRatio, "Position is collatoralized");
 
-//        (timestamp, price) = priceFeed.getPrice(priceId);
-
+        //        (timestamp, price) = priceFeed.getPrice(priceId);
     }
 }
 
@@ -125,6 +124,7 @@ contract Coin is ERC20 {
     /**
      * @dev Mints for authenticated position contracts.
      */
+
     function mint(address _positionAddress, address _receiver, uint256 _moreDebt) public {
         require(notary.isValidPosition(_positionAddress), "Caller is not authorized to mint");
         _mint(_receiver, _moreDebt);
@@ -158,8 +158,7 @@ contract PriceFeed {
             int256 _price,
             /*uint startedAt*/
             ,
-            uint256 _timestamp
-            ,
+            uint256 _timestamp,
             /*uint80 answeredInRound*/
         ) = priceFeed.latestRoundData();
 
