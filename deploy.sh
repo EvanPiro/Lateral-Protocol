@@ -1,0 +1,1 @@
+source .env && forge script script/DeployProtocol.s.sol:DeployProtocol --rpc-url $SEPOLIA_RPC_URL --broadcast --verify
