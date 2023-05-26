@@ -62,7 +62,7 @@ contract SimpleStable is Test {
         Position position = Position(positionAddress);
 
         vm.expectRevert("Position cannot take debt");
-        position.take(owner, 100000000);
+        position.take(owner, 1);
         console.log(coin.balanceOf(owner));
         vm.stopPrank();
     }
