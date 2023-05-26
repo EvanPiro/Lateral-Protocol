@@ -35,16 +35,25 @@ contract MockAggregatorV3Interface is AggregatorV3Interface {
 }
 
 contract SimpleStable is Test {
+    uint256 minRatio;
     AggregatorV3Interface aggregator;
     Notary notary;
     PriceFeed priceFeed;
+    Coin coin;
+
+    address owner = address(2);
 
     function setUp() public {
         aggregator = new MockAggregatorV3Interface();
         priceFeed = new PriceFeed(address(aggregator));
-        notary = new Notary(150, address(priceFeed));
+        notary = new Notary(minRatio, address(priceFeed));
+        coin = new Coin(address(notary));
+        notary.activate(address(coin));
     }
 
-    function test_CanOpenPositionThroughNotary() public {}
-
+    function test_CanOpenPositionThroughNotary() public {
+        address positionAddress = notary.openPosition(owner);
+        Position position = Position(positionAddress);
+        assertEq(position.minRatio(), minRatio);
+    }
 }

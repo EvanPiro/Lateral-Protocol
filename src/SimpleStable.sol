@@ -39,6 +39,7 @@ contract Notary is Ownable {
     function activate(address _coinAddress) public onlyOwner {
         // @Todo check for notary address, investigate recursive implications.
         coinAddress = _coinAddress;
+        activated = true;
     }
 
     /**
