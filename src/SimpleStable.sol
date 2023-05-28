@@ -45,8 +45,15 @@ contract Notary is Ownable {
     /**
      * @dev Opens a position for a specified vault owner address.
      */
-    function openPosition(address ownerAddress) public isActivated returns (address positionAddress) {
-        Position position = new Position(minRatio, priceFeedAddress, coinAddress, ownerAddress);
+    function openPosition(
+        address ownerAddress
+    ) public isActivated returns (address positionAddress) {
+        Position position = new Position(
+            minRatio,
+            priceFeedAddress,
+            coinAddress,
+            ownerAddress
+        );
         address _positionAddress = address(position);
 
         isValidPosition[_positionAddress] = true;
@@ -69,8 +76,16 @@ contract Position is Ownable {
     uint256 debt;
     bool isInsolvent;
 
-    constructor(uint256 _minRatio, address _priceFeedAddress, address _coinAddress, address _owner) {
-        require(_minRatio > 0, "Minimum collatoralization ratio must be above 0");
+    constructor(
+        uint256 _minRatio,
+        address _priceFeedAddress,
+        address _coinAddress,
+        address _owner
+    ) {
+        require(
+            _minRatio > 0,
+            "Minimum collatoralization ratio must be above 0"
+        );
         minRatio = _minRatio;
         priceFeed = PriceFeed(_priceFeedAddress);
         coin = Coin(_coinAddress);
@@ -88,7 +103,14 @@ contract Position is Ownable {
         uint256 price = priceFeed.price();
         uint256 collateralInCoins = price * collateral;
         uint256 debtInCoins = debt + _moreDebt;
-        return (collateralInCoins * 100 / debtInCoins) >= minRatio;
+        return ((collateralInCoins * 100) / debtInCoins) >= minRatio;
+    }
+
+    function calculateCollateralAmount(
+        uint _stablecoinAmount
+    ) public view returns (uint) {
+        uint collateralprice = priceFeed.price();
+        return _stablecoinAmount.mul(COLLATERAL_DECIMAL).div(collateralprice);
     }
 
     /**
@@ -111,6 +133,17 @@ contract Position is Ownable {
 
         //        (timestamp, price) = priceFeed.getPrice(priceId);
     }
+
+    function Retrieve(uint256 _stablecoinAmount, address _receiver) public {
+        require(
+            balanceOf(msg.sender) >= _stablecoinAmount,
+            "Balance has less than the stable coin amount"
+        );
+
+        uint collateralAmount = calculateCollateralAmount(_stablecoinAmount);
+        coin.burn(_stablecoinAmount);
+        collateralToken.transfer(msg.sender, collateralAmount);
+    }
 }
 
 /**
@@ -126,13 +159,27 @@ contract Coin is ERC20 {
     constructor(address _notaryAddress) ERC20("Coin", "coin") {
         notary = Notary(_notaryAddress);
     }
+
     /**
      * @dev Mints for authenticated position contracts.
      */
 
-    function mint(address _positionAddress, address _receiver, uint256 _moreDebt) public {
-        require(notary.isValidPosition(_positionAddress), "Caller is not authorized to mint");
+    function mint(
+        address _positionAddress,
+        address _receiver,
+        uint256 _moreDebt
+    ) external {
+        require(
+            notary.isValidPosition(_positionAddress),
+            "Caller is not authorized to mint"
+        );
         _mint(_receiver, _moreDebt);
+    }
+
+    function burn(uint256 _stablecoinAmount) external {
+        require(_stablecoinAmount > 0, "Invalid stablecoin amount");
+
+        _burn(msg.sender, _stablecoinAmount);
     }
 }
 
