@@ -11,4 +11,4 @@
 	url = https://github.com/openZeppelin/openzeppelin-contracts-upgradeable
 [submodule "lib/chainlink"]
 	path = lib/chainlink
-	url = https://github.com/smartcontractkit/chainlink
+	url = https://github.com/Smartcontractkit/chainlink
