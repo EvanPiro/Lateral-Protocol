@@ -26,6 +26,10 @@ contract Position is Ownable {
     Basket collateral;
     uint256 public constant RATIO = 150;
     uint256 public constant COLLATERAL_DECIMAL = 1e18;
+    address user;
+    uint256 public constant FEE = 500;
+    uint256 public constant PENALTY = 500;
+    uint256 private s_lastTimeStamp;
 
     constructor(
         IERC20[] memory tokens,
@@ -41,7 +45,9 @@ contract Position is Ownable {
         }
         coin = Coin(_coinAddress);
         transferOwnership(_owner);
+        user = _owner;
         debt = 0;
+        s_lastTimeStamp = block.timestamp;
         isInsolvent = false;
     }
 
@@ -94,12 +100,28 @@ contract Position is Ownable {
     function liquidate(uint256 priceId) public {
         uint256 totalCollateralInUSD = TotalBalanceInUsd();
         uint256 cRatio = (totalCollateralInUSD * 100) / debt;
-        require(cRatio < RATIO, "Position is collatoralized");
-        isInsolvent = true;
-        // Transfer collateral to liquidator or perform necessary actions
+        require(cRatio < RATIO, "Position is collateralized");
+
+        // 1. Receive Loan Stablecoins from the debtor
+        // uint256 stablecoinAmount = coin.balanceOf(msg.sender);
+        require(debt > 0, "No loan stablecoins to repay");
+        coin.transferFrom(user, address(this), debt);
+
+        // 2. Return Remaining Collateral to the debtor (after deducting fee)
+        uint256 fee = FEE * debt * (block.timestamp - s_lastTimeStamp);
+        uint256 penalty = PENALTY * debt;
+        uint256 remainingCollateral = totalCollateralInUSD - fee - penalty;
+
         collateral.Transfer(msg.sender, address(this));
 
-        //        (timestamp, price) = priceFeed.getPrice(priceId);
+        // 3. Burn Loan Stablecoins (optional)
+        coin.burn(msg.sender, debt);
+
+        // Perform any additional actions required for liquidation
+        // ...
+
+        isInsolvent = true;
+        // (timestamp, price) = priceFeed.getPrice(priceId);
     }
 
     function RetrieveAll() public onlyOwner {

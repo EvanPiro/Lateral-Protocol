@@ -2,15 +2,15 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "./MockERC20.sol";
 import "./MockV3Aggregator.sol";
 import "../src/Position.sol";
 import "../src/Notary.sol";
 
 contract PositionTest is Test {
-    ERC20 private mockToken1;
-    ERC20 private mockToken2;
-    ERC20 private mockToken3;
+    MockERC20 private mockToken1;
+    MockERC20 private mockToken2;
+    MockERC20 private mockToken3;
     AggregatorV3Interface private mockPriceFeed1;
     AggregatorV3Interface private mockPriceFeed2;
     AggregatorV3Interface private mockPriceFeed3;
@@ -21,9 +21,9 @@ contract PositionTest is Test {
     Coin coin;
 
     function setUp() public {
-        mockToken1 = new ERC20("Test1", "T1");
-        mockToken2 = new ERC20("Test2", "T2");
-        mockToken3 = new ERC20("Test3", "T3");
+        mockToken1 = new MockERC20();
+        mockToken2 = new MockERC20();
+        mockToken3 = new MockERC20();
         mockPriceFeed1 = new MockV3Aggregator(8, 10000000000);
         mockPriceFeed2 = new MockV3Aggregator(8, 20000000000);
         mockPriceFeed3 = new MockV3Aggregator(8, 30000000000);
@@ -60,9 +60,9 @@ contract PositionTest is Test {
         console.log(address(1));
         console.log(address(1));
 
-        mockToken1._mint(address(1), 1000 * 30);
-        mockToken2._mint(address(1), 1000 * 30);
-        mockToken3._mint(address(1), 1000 * 40);
+        mockToken1.mint(address(1), 1000 * 30);
+        mockToken2.mint(address(1), 1000 * 30);
+        mockToken3.mint(address(1), 1000 * 40);
 
         vm.startPrank(address(1));
         mockToken1.transfer(
