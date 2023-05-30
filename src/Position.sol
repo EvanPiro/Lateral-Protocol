@@ -87,6 +87,7 @@ contract Position is Ownable {
 
     /**
      * @dev Takes out loan against collateral if the vault is solvent
+     *  An approve function needs to be added in case of liquidation
      */
     function take(address _receiver, uint256 _moreDebt) public onlyOwner {
         require(canTake(_moreDebt), "Position cannot take debt");
@@ -96,6 +97,7 @@ contract Position is Ownable {
 
     /**
      * @dev Liquidates vault if priceId points to a price record of insolvency.
+     * This function should be in the notary contract with regular checks
      */
     function liquidate(uint256 priceId) public {
         uint256 totalCollateralInUSD = TotalBalanceInUsd();
@@ -104,24 +106,29 @@ contract Position is Ownable {
 
         // 1. Receive Loan Stablecoins from the debtor
         // uint256 stablecoinAmount = coin.balanceOf(msg.sender);
+        // Need to check available tokens
+        // Aprove function needs to be added in the take loan function
         require(debt > 0, "No loan stablecoins to repay");
         coin.transferFrom(user, address(this), debt);
 
         // 2. Return Remaining Collateral to the debtor (after deducting fee)
+        // If available stables < debt, reduce the collateral by the missing amount
+        // Since this is basket like col, reduce each balance until 0 then repeat
         uint256 fee = FEE * debt * (block.timestamp - s_lastTimeStamp);
         uint256 penalty = PENALTY * debt;
         uint256 remainingCollateral = totalCollateralInUSD - fee - penalty;
-
+        // Transfer to the debtor
         collateral.Transfer(msg.sender, address(this));
 
         // 3. Burn Loan Stablecoins (optional)
+        // burn the stablecoins received
         coin.burn(msg.sender, debt);
 
-        // Perform any additional actions required for liquidation
+        // Send the remaining fees/collateral to the Notary contract
         // ...
 
         isInsolvent = true;
-        // (timestamp, price) = priceFeed.getPrice(priceId);
+        // If all the debt is paid, free this contract once again
     }
 
     function RetrieveAll() public onlyOwner {
