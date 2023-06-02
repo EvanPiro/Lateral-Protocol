@@ -49,31 +49,31 @@ contract Notary is Ownable {
     /**
      * @dev Opens a position for a specified vault owner address.
      */
-    function openVault(
-        IERC20[] memory tokens,
-        uint8[] memory decimals,
-        uint256[] memory weights,
-        AggregatorV3Interface[] memory priceFeeds,
-        address ownerAddress
-    ) public isActivated returns (address positionAddress) {
-        Vault vault = new Vault(
-            tokens,
-            decimals,
-            weights,
-            priceFeeds,
-            coinAddress,
-            ownerAddress,
-            address(this)
-        );
-        address _vaultAddress = address(vault);
+    // function openVault(
+    //     IERC20[] memory tokens,
+    //     uint8[] memory decimals,
+    //     uint256[] memory weights,
+    //     AggregatorV3Interface[] memory priceFeeds,
+    //     address ownerAddress
+    // ) public isActivated returns (address positionAddress) {
+    //     Vault vault = new Vault(
+    //         tokens,
+    //         decimals,
+    //         weights,
+    //         priceFeeds,
+    //         coinAddress,
+    //         ownerAddress,
+    //         address(this)
+    //     );
+    //     address _vaultAddress = address(vault);
 
-        isValidPosition[_vaultAddress] = true;
-        vaults.push(vault);
-        vaultID += 1;
+    //     isValidPosition[_vaultAddress] = true;
+    //     vaults.push(vault);
+    //     vaultID += 1;
 
-        emit VaultOpened(_vaultAddress);
-        return _vaultAddress;
-    }
+    //     emit VaultOpened(_vaultAddress);
+    //     return _vaultAddress;
+    // }
 
     function liquidateVaults() public onlyOwner {
         uint256 length = vaults.length;

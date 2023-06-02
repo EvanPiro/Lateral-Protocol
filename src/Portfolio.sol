@@ -4,34 +4,46 @@
 pragma solidity ^0.8.0;
 
 import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
-import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
-import "./Coin.sol";
+import "./Vault.sol";
 
 contract Portfolio {
-    function uniswapV3(
-        uint256 amountIn,
+    ISwapRouter immutable router;
+
+    // Basket targetAssets;
+
+    constructor(
+        address _uniswapV3Router // IERC20[] memory tokens, // uint8[] memory decimals, // uint256[] memory weights, // AggregatorV3Interface[] memory priceFeeds
+    ) {
+        router = ISwapRouter(_uniswapV3Router);
+        // for (uint256 i = 0; i < length; ++i) {
+        //     targetAssets.add(tokens[i], decimals[i], weights[i], priceFeeds[i]);
+        // }
+    }
+
+    function swapExactInputSingleHop(
         address tokenIn,
-        address tokenOut
-    ) public returns (uint256 amountOut) {
-        address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-        uint24 fee = 3000;
-        address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-        ISwapRouter swapRouter = ISwapRouter(router);
-        // approveToken(tokenIn, address(swapRouter), amountIn);
-        // multi hop swaps
-        amountOut = swapRouter.exactInput(
-            ISwapRouter.ExactInputParams({
-                path: abi.encodePacked(tokenIn, fee, WETH, fee, tokenOut),
-                recipient: address(this),
+        address tokenOut,
+        uint24 poolFee,
+        uint amountIn
+    ) external returns (uint amountOut) {
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(tokenIn).approve(address(router), amountIn);
+
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: poolFee,
+                recipient: msg.sender,
                 deadline: block.timestamp,
                 amountIn: amountIn,
-                amountOutMinimum: 0
-            })
-        );
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        amountOut = router.exactInputSingle(params);
     }
 
     // function rebalancePortfolio(
@@ -87,37 +99,122 @@ contract Portfolio {
     //         }
     //     }
     // }
+    function calculateTargetValues(
+        uint256 totalValueInDecimals,
+        uint256[] memory targetWeights
+    ) public returns (uint256[] memory targetAmountsInUsdDecimals) {
+        uint256 length = targetWeights.length;
+        targetAmountsInUsdDecimals = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            targetAmountsInUsdDecimals[i] =
+                (totalValueInDecimals * targetWeights[i]) /
+                100;
+        }
+    }
+
+    function calculateAmountsToRebalance(
+        Vault vault,
+        address[] memory targetAssets,
+        uint256[] memory targetAmountsInUsdDecimals
+    )
+        public
+        returns (
+            IERC20[] memory tokenToSwap,
+            uint256[] memory colAmounts,
+            address[] memory tokenToreceive
+        )
+    {
+        // uint256 lengthCol = vault.getTokens().length;
+        // uint256 lengthColTarget = targetAmountsInUsdDecimals.length;
+        uint256 k = 0;
+        tokenToSwap = new IERC20[](
+            vault.getTokens().length + targetAmountsInUsdDecimals.length
+        );
+        colAmounts = new uint256[](
+            vault.getTokens().length + targetAmountsInUsdDecimals.length
+        );
+        tokenToreceive = new address[](
+            vault.getTokens().length + targetAmountsInUsdDecimals.length
+        );
+
+        for (uint256 i = 0; i < vault.getTokens().length; i++) {
+            // IERC20 token = vault.getTokens()[i];
+            // uint8 decimal = vault.getDecimals(vault.getTokens()[i]);
+            // uint256 tokenBalance = vault.getTokens()[i].balanceOf(address(vault));
+            // uint256 tokenPrice = PriceConverter.getPrice(
+            //     vault.getPriceFeed(vault.getTokens()[i])
+            // );
+            uint256 tokenValueInUsdDecimals = (PriceConverter.getConversionRate(
+                vault.getTokens()[i].balanceOf(address(vault)),
+                vault.getPriceFeed(vault.getTokens()[i])
+            ) * vault.ERC_DECIMAL()) /
+                10 ** vault.getDecimals(vault.getTokens()[i]);
+
+            for (uint256 j = 0; j < targetAmountsInUsdDecimals.length; j++) {
+                if (tokenValueInUsdDecimals > targetAmountsInUsdDecimals[j]) {
+                    tokenToSwap[k] = vault.getTokens()[i];
+                    colAmounts[k] =
+                        (targetAmountsInUsdDecimals[j] *
+                            10 ** vault.getDecimals(vault.getTokens()[i])) /
+                        PriceConverter.getPrice(
+                            vault.getPriceFeed(vault.getTokens()[i])
+                        );
+                    tokenToreceive[k] = targetAssets[j];
+                    k = k + 1;
+                    tokenValueInUsdDecimals -= targetAmountsInUsdDecimals[j];
+                    console.log(colAmounts[k]);
+                    // console.log(tokenToSwap[k]);
+                    console.log(tokenToreceive[k]);
+                } else {
+                    tokenToSwap[k] = vault.getTokens()[i];
+                    colAmounts[k] =
+                        (tokenValueInUsdDecimals *
+                            10 ** vault.getDecimals(vault.getTokens()[i])) /
+                        PriceConverter.getPrice(
+                            vault.getPriceFeed(vault.getTokens()[i])
+                        );
+                    tokenToreceive[k] = targetAssets[j];
+                    targetAmountsInUsdDecimals[j] -= tokenValueInUsdDecimals;
+                    console.log(colAmounts[k]);
+                    // console.log(tokenToSwap[k]);
+                    console.log(tokenToreceive[k]);
+                    k = k + 1;
+                    tokenValueInUsdDecimals = 0;
+
+                    break;
+                }
+            }
+        }
+    }
 
     // function rebalancePortfolio(
-    //     uint256 positionId,
+    //     Vault vault,
     //     address[] memory targetAssets,
     //     uint256[] memory targetWeights
     // ) external {
-    //     // Get the position from the positionId
-    //     Position storage position = positions[positionId];
+    //     // // Get the position from the positionId
+    //     // Position storage position = positions[positionId];
 
     //     // Ensure the position is active
-    //     require(position.active, "Invalid position");
+    //     // require(position.active, "Invalid position");
 
     //     // Get the current collateral and calculate the total value
-    //     address[] memory collateralAssets = position.collateralAssets;
-    //     uint256[] memory collateralAmounts = position.collateralAmounts;
-    //     uint256 totalValue = calculateTotalValue(
-    //         collateralAssets,
-    //         collateralAmounts
-    //     );
+    //     // address[] memory collateralAssets = position.collateralAssets;
+    //     // uint256[] memory collateralAmounts = position.collateralAmounts;
+    //     uint256 totalValueInDecimals = vault.TotalBalanceInDecimals();
 
-    //     // Calculate the target values based on the target weights
-    //     uint256[] memory targetValues = calculateTargetValues(
-    //         totalValue,
+    //     // Calculate the target Amounts based on the target weights
+    //     uint256[] memory targetAmountsInUsdDecimals = calculateTargetValues(
+    //         totalValueInDecimals,
     //         targetWeights
     //     );
 
     //     // Calculate the amounts needed to rebalance
+    //     // This
     //     int256[] memory amountsToRebalance = calculateAmountsToRebalance(
     //         collateralAssets,
     //         collateralAmounts,
-    //         targetValues
+    //         targetAmountsInTokenDecimals
     //     );
 
     //     // Rebalance the portfolio by swapping assets

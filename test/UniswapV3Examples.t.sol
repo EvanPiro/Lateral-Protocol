@@ -20,12 +20,15 @@ contract UniV3Test is Test {
     function setUp() public {}
 
     function testSingleHop() public {
+        vm.startPrank(address(1));
         weth.deposit{value: 1e18}();
+        console.log(dai.balanceOf(address(1)));
         weth.approve(address(uni), 1e18);
 
         uint amountOut = uni.swapExactInputSingleHop(WETH, DAI, 3000, 1e18);
 
         console.log("DAI", amountOut);
+        console.log(dai.balanceOf(address(1)));
     }
 
     function testMultiHop() public {

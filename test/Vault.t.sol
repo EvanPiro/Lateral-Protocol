@@ -79,6 +79,7 @@ contract VaultTest is Test {
 
         notary = new Notary(RATIO);
         coin = new Coin(address(notary));
+        address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
         vault = new Vault(
             tokens,
@@ -87,7 +88,8 @@ contract VaultTest is Test {
             priceFeeds,
             address(coin),
             address(1),
-            address(notary)
+            address(notary),
+            router
         );
         console.log("Vault created!");
 
@@ -253,5 +255,44 @@ contract VaultTest is Test {
         assertEq(T.balanceCoin1NotaryAfter, 0);
         assertEq(T.balanceCoin2NotaryAfter, 0);
         assertEq(T.balanceCoin3NotaryAfter, collateralkept);
+    }
+
+    function testcalculateTargetValues() public {
+        uint256 totalValueInDecimals = vault.TotalBalanceInDecimals();
+        uint256[] memory targetWeights = new uint256[](3);
+        targetWeights[0] = 30;
+        targetWeights[1] = 30;
+        targetWeights[2] = 40;
+
+        uint256[] memory returnV = new uint256[](3);
+        returnV = vault.portfolio().calculateTargetValues(
+            totalValueInDecimals,
+            targetWeights
+        );
+        console.log("we here");
+        console.log(returnV[0]);
+        console.log(returnV[1]);
+        console.log(returnV[2]);
+
+        address[] memory addressV = new address[](3);
+        addressV[0] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+        addressV[1] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+        addressV[2] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+
+        IERC20[] memory tokenToSwap = new IERC20[](3);
+        uint256[] memory colAmounts = new uint256[](3);
+        address[] memory tokenToreceive = new address[](3);
+
+        (
+            tokenToSwap,
+            colAmounts,
+            tokenToreceive
+        ) = vault.portfolio().calculateAmountsToRebalance(
+                vault,
+                addressV,
+                returnV
+            );
+
+        // console.log(tokenToSwap[0]);
     }
 }

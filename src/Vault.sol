@@ -8,6 +8,7 @@ import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
 import "./Coin.sol";
+import "./Portfolio.sol";
 
 /**
  * @dev Position contract manages a tokenized debt position.
@@ -31,6 +32,7 @@ contract Vault is Ownable {
     address public notary;
     uint public constant ERC_DECIMAL = 1e18;
     uint8 public STABLE_DECIMAL;
+    Portfolio public portfolio;
 
     event UserDefaulted(address indexed debtor, uint256 debt);
 
@@ -41,7 +43,8 @@ contract Vault is Ownable {
         AggregatorV3Interface[] memory priceFeeds,
         address _coinAddress,
         address _owner,
-        address _notary
+        address _notary,
+        address _uniswapV3Router
     ) {
         uint256 length = tokens.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -55,6 +58,7 @@ contract Vault is Ownable {
         isInsolvent = false;
         notary = _notary;
         STABLE_DECIMAL = coin.decimals();
+        portfolio = new Portfolio(_uniswapV3Router);
     }
 
     /**
@@ -268,5 +272,19 @@ contract Vault is Ownable {
 
     function getWeights(IERC20 token) public view returns (uint256) {
         return collateral.weightsInPercent[token];
+    }
+
+    function getTokens() public view returns (IERC20[] memory) {
+        return collateral.erc20s;
+    }
+
+    function getDecimals(IERC20 token) public view returns (uint8) {
+        return collateral.decimals[token];
+    }
+
+    function getPriceFeed(
+        IERC20 token
+    ) public view returns (AggregatorV3Interface) {
+        return collateral.priceFeedBasket[token];
     }
 }
