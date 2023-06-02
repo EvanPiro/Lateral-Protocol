@@ -7,17 +7,17 @@ import "./PriceConverter.sol";
 
 struct Basket {
     IERC20[] erc20s; // enumerated keys for refAmts
+    mapping(IERC20 => uint8) decimals;
     mapping(IERC20 => uint256) weightsInPercent; // {ref/BU}
     mapping(IERC20 => AggregatorV3Interface) priceFeedBasket;
     bool empty;
 }
 
-uint256 constant FIX_ZERO = 0;
-
 /*
  * @title BasketLibP0
  */
 library BasketLib {
+    uint256 constant FIX_ZERO = 0;
     using PriceConverter for uint256;
 
     /// Set self to a fresh, empty basket
@@ -52,29 +52,31 @@ library BasketLib {
     // self'.erc20s is keys(self'.refAmts)
     function add(
         Basket storage self,
-        IERC20 tok,
+        IERC20 _tok,
+        uint8 _decimal,
         uint256 _weight,
         AggregatorV3Interface _priceFeed
     ) internal {
         if (_weight == FIX_ZERO) return;
-        if (self.weightsInPercent[tok] == FIX_ZERO) {
-            self.erc20s.push(tok);
-            self.weightsInPercent[tok] = _weight;
-            self.priceFeedBasket[tok] = _priceFeed;
+        if (self.weightsInPercent[_tok] == FIX_ZERO) {
+            self.erc20s.push(_tok);
+            self.decimals[_tok] = _decimal;
+            self.weightsInPercent[_tok] = _weight;
+            self.priceFeedBasket[_tok] = _priceFeed;
         } else {
-            self.weightsInPercent[tok] += _weight;
+            self.weightsInPercent[_tok] += _weight;
         }
     }
 
-    function Balance(
+    function getBasketBalance(
         Basket storage self,
         address account
     ) internal view returns (uint256 balance) {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
-            balance += self.erc20s[i].balanceOf(account).getConversionRate(
+            balance += ((self.erc20s[i].balanceOf(account).getConversionRate(
                 self.priceFeedBasket[self.erc20s[i]]
-            );
+            ) * 1e18) / 10 ** self.decimals[self.erc20s[i]]);
         }
     }
 

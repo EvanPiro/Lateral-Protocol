@@ -23,6 +23,10 @@ contract Coin is ERC20 {
         notary = Notary(_notaryAddress);
     }
 
+    function decimals() public view override returns (uint8) {
+        return 18;
+    }
+
     /**
      * @dev Mints for authenticated position contracts.
      */

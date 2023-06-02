@@ -16,7 +16,7 @@ contract Portfolio {
         uint256 amountIn,
         address tokenIn,
         address tokenOut
-    ) internal returns (uint256 amountOut) {
+    ) public returns (uint256 amountOut) {
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         uint24 fee = 3000;
         address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
