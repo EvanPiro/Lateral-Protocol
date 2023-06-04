@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import "../src/Vault.sol";
+import "../../src/Vault.sol";
 // import "../src/UniswapV3Examples.sol";
 
 address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -13,6 +13,7 @@ address constant WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
 address constant PAXG = 0x45804880De22913dAFE09f4980848ECE6EcbAf78;
 address constant LINK = 0x514910771AF9Ca656af840dff83E8264EcF986CA;
 address constant router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+address constant ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 
 address constant ETHUSD = 0xb49f677943BC038e9857d61E7d053CaA2C1734C1;
 address constant DAIETH = 0x773616E4d11A78F511299002da57A0a94577F1f4;
@@ -64,7 +65,8 @@ contract UniV3Test is Test {
 
     Notary notary = new Notary(RATIO);
     Coin coin = new Coin(address(notary));
-    Portfolio portfolio = new Portfolio(router, address(notary), address(1));
+    Portfolio portfolio =
+        new Portfolio(router, ROUTERV02, address(notary), address(1));
 
     uint256 public amountToMint1;
     uint256 public amountToMint2;
@@ -117,39 +119,44 @@ contract UniV3Test is Test {
 
     function testupdateCollateralPortfolio() public {
         vault.updateCollateralPortfolio(WETH, 3000);
+        console.log(address(vault.getTokens()[0]));
+        console.log(vault.getWeights(vault.getTokens()[0]));
+        console.log(vault.getAmounts(vault.getTokens()[0]));
+        console.log(vault.getDecimals(vault.getTokens()[0]));
+        //console.log(vault.getPriceFeeds(vault.getTokens()[0]));
+        console.log("--");
+        console.log(address(vault.getTokens()[1]));
+        console.log(vault.getWeights(vault.getTokens()[1]));
+        console.log(vault.getAmounts(vault.getTokens()[1]));
+        console.log(vault.getDecimals(vault.getTokens()[1]));
+        console.log("--");
+        console.log(address(vault.getTokens()[2]));
+        console.log(vault.getWeights(vault.getTokens()[2]));
+        console.log(vault.getAmounts(vault.getTokens()[2]));
+        console.log(vault.getDecimals(vault.getTokens()[2]));
+
+        console.log("------");
+        console.log(address(vault.getTokens()[3]));
+        console.log(vault.getWeights(vault.getTokens()[3]));
+        console.log(vault.getAmounts(vault.getTokens()[3]));
+        console.log(vault.getDecimals(vault.getTokens()[3]));
+
+        // console.log("------");
+        // console.log(address(vault.getTokens()[4]));
+        // console.log(vault.getWeights(vault.getTokens()[4]));
+        // console.log(vault.getAmounts(vault.getTokens()[4]));
+        // console.log(vault.getDecimals(vault.getTokens()[4]));
+
+        // console.log("------");
+        // console.log(address(vault.getTokens()[5]));
+        // console.log(vault.getWeights(vault.getTokens()[5]));
+        // console.log(vault.getAmounts(vault.getTokens()[5]));
+        // console.log(vault.getDecimals(vault.getTokens()[5]));
+
+        // console.log("------");
+        // console.log(address(vault.getTokens()[6]));
+        // console.log(vault.getWeights(vault.getTokens()[6]));
+        // console.log(vault.getAmounts(vault.getTokens()[6]));
+        // console.log(vault.getDecimals(vault.getTokens()[6]));
     }
-    // vault = Vault(
-    //         notary.openVault(address(1), address(mockPriceFeedETHUSD))
-    //     );
-
-    // function setUp() public {}
-
-    // function testSingleHop() public {
-    //     vm.startPrank(address(1));
-    //     weth.deposit{value: 1e18}();
-    //     console.log(dai.balanceOf(address(1)));
-    //     weth.approve(address(uni), 1e18);
-
-    //     uint amountOut = uni.swapExactInputSingleHop(WETH, DAI, 3000, 1e18);
-
-    //     console.log("DAI", amountOut);
-    //     console.log(dai.balanceOf(address(1)));
-    // }
-
-    // function testMultiHop() public {
-    //     weth.deposit{value: 1e18}();
-    //     weth.approve(address(uni), 1e18);
-
-    //     bytes memory path = abi.encodePacked(
-    //         WETH,
-    //         uint24(3000),
-    //         USDC,
-    //         uint24(100),
-    //         DAI
-    //     );
-
-    //     uint amountOut = uni.swapExactInputMultiHop(path, WETH, 1e18);
-
-    //     console.log("DAI", amountOut);
-    // }
 }

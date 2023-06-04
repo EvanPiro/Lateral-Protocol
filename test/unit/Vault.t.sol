@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "./MockERC20.sol";
-import "./MockV3Aggregator.sol";
-import "../src/Vault.sol";
-import "../src/Notary.sol";
+import "../Mocks/MockERC20.sol";
+import "../Mocks/MockV3Aggregator.sol";
+import "../../src/Vault.sol";
+import "../../src/Notary.sol";
 
 contract VaultTest is Test {
     MockERC20 private mockToken1;
@@ -83,7 +83,13 @@ contract VaultTest is Test {
         notary = new Notary(RATIO);
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-        portfolio = new Portfolio(router, address(notary), address(1));
+        address ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+        portfolio = new Portfolio(
+            router,
+            ROUTERV02,
+            address(notary),
+            address(1)
+        );
 
         notary.activate(address(coin), address(portfolio));
         vault = Vault(

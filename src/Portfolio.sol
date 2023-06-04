@@ -4,6 +4,7 @@
 pragma solidity ^0.8.0;
 
 import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "lib/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./Notary.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
@@ -24,8 +25,9 @@ contract Portfolio {
 
     uint160 internal constant MAX_SQRT_RATIO =
         1461446703485210103287273052203988822378723970342;
+    uint160 internal constant MIN_SQRT_RATIO = 4295128739;
     ISwapRouter immutable i_router;
-    ISwapRouter immutable i_routerV2;
+    IUniswapV2Router02 immutable i_routerV2;
     address immutable i_notary;
     address immutable i_dev;
 
@@ -59,12 +61,12 @@ contract Portfolio {
 
     constructor(
         address _uniswapV3Router, // IERC20[] memory tokens, // uint8[] memory decimals, // uint256[] memory weights, // AggregatorV3Interface[] memory priceFeeds
-        address __uniswapV2Router,
+        address _uniswapV2Router,
         address _notaryAddress,
         address dev
     ) {
         i_router = ISwapRouter(_uniswapV3Router);
-        i_router = ISwapRouter(_uniswapV2Router);
+        i_routerV2 = IUniswapV2Router02(_uniswapV2Router);
         i_notary = _notaryAddress;
         i_dev = dev;
         // for (uint256 i = 0; i < length; ++i) {
@@ -86,21 +88,21 @@ contract Portfolio {
         s_decimals = _decimals;
     }
 
-    function swapSingleHopExactAmountIn(
+    function swapSingleHopExactAmountInV2(
         address tokenIn,
         address tokenOut,
         uint amountIn,
         uint amountOutMin
-    ) external returns (uint amountOut) {
+    ) internal returns (uint amountOut) {
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
-        IERC20(tokenIn).approve(address(router), amountIn);
+        IERC20(tokenIn).approve(address(i_routerV2), amountIn);
 
         address[] memory path;
         path = new address[](2);
-        path[0] = WETH;
-        path[1] = DAI;
+        path[0] = tokenIn;
+        path[1] = tokenOut;
 
-        uint[] memory amounts = router.swapExactTokensForTokens(
+        uint[] memory amounts = i_routerV2.swapExactTokensForTokens(
             amountIn,
             amountOutMin,
             path,
@@ -178,22 +180,63 @@ contract Portfolio {
         uint256 lengthW = s_targetWeights.length;
         // Rebalance the portfolio by swapping assets
         for (uint256 i = 0; i < lengthW; i++) {
+            // s_tokenAmounts.push(
+            //     swapExactInputSingleHop(
+            //         weth,
+            //         s_assetsAddress[i],
+            //         _poolFee,
+            //         targetAmountsInDecimals[i],
+            //         false
+            //     )
+            // );
             s_tokenAmounts.push(
-                swapExactInputSingleHop(
+                swapSingleHopExactAmountInV2(
                     weth,
                     s_assetsAddress[i],
-                    _poolFee,
                     targetAmountsInDecimals[i],
-                    false
+                    0
                 )
             );
+        }
+        uint256 wethBalance = IERC20(weth).balanceOf(address(vault));
+        if (wethBalance > 0) {
+            s_tokenAmounts.push(wethBalance);
+            s_assetsAddress.push(weth);
+            s_targetWeights.push(1);
+            s_decimals.push(18);
+            s_priceFeeds.push(vault.getBenchmarkFeed());
+        }
+
+        uint256 lengthV = vault.getTokens().length;
+        for (uint256 i = 0; i < lengthV; ++i) {
+            uint256 token1Balance = IERC20(vault.getTokens()[i]).balanceOf(
+                address(vault)
+            );
+            // console.log("************");
+            // console.log(token1Balance);
+            if (address(vault.getTokens()[i]) != weth) {
+                // uint256 token1Balance = IERC20(vault.getTokens()[i]).balanceOf(
+                //     address(vault)
+                // );
+                // console.log("************");
+                // console.log(token1Balance);
+                if (token1Balance > 0) {
+                    s_tokenAmounts.push(token1Balance);
+                    s_assetsAddress.push(address(vault.getTokens()[i]));
+                    s_targetWeights.push(1);
+                    s_decimals.push(vault.getDecimals(vault.getTokens()[i]));
+                    s_priceFeeds.push(
+                        vault.getPriceFeeds(vault.getTokens()[i])
+                    );
+                }
+            }
         }
     }
 
     function getSqrtPriceLimitX96(
         bool zeroForOne
     ) internal pure returns (uint160) {
-        return zeroForOne ? 0 : MAX_SQRT_RATIO - 1;
+        return zeroForOne ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1;
     }
 
     function getAssets() public view returns (address[] memory) {
@@ -206,6 +249,10 @@ contract Portfolio {
 
     function getWeights() public view returns (uint256[] memory) {
         return s_targetWeights;
+    }
+
+    function getDecimals() public view returns (uint8[] memory) {
+        return s_decimals;
     }
 
     function getPriceFeeds()

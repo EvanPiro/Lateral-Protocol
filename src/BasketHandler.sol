@@ -57,6 +57,7 @@ library BasketLib {
         Basket storage self,
         address[] memory erc20s,
         uint256[] memory tokenAmts,
+        uint8[] memory decimals,
         uint256[] memory weightsInPercent,
         AggregatorV3Interface[] memory priceFeedBasket
     ) internal {
@@ -65,6 +66,7 @@ library BasketLib {
         for (uint256 i = 0; i < length; ++i) {
             self.erc20s.push(IERC20(erc20s[i]));
             self.tokenAmts[IERC20(erc20s[i])] = tokenAmts[i];
+            self.decimals[IERC20(erc20s[i])] = decimals[i];
             self.weightsInPercent[IERC20(erc20s[i])] = weightsInPercent[i];
             self.priceFeedBasket[IERC20(erc20s[i])] = priceFeedBasket[i];
         }

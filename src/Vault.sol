@@ -30,7 +30,6 @@ contract Vault {
 
     Coin private immutable i_coin;
     uint8 private immutable i_stablecoin_decimals;
-    AggregatorV3Interface private immutable i_priceFeedEth;
     uint256 private constant RATIO = 150;
     uint256 private constant RATE = 5;
     uint256 private constant PENALTY = 13;
@@ -78,7 +77,6 @@ contract Vault {
         s_notary = _notary;
         i_stablecoin_decimals = i_coin.decimals();
         s_portfolio = Portfolio(_portfolio);
-        i_priceFeedEth = AggregatorV3Interface(_EthUSD);
         s_collateral.priceFeedEth = AggregatorV3Interface(_EthUSD);
     }
 
@@ -198,7 +196,7 @@ contract Vault {
                     tokenBalance,
                     s_collateral.priceFeedBasket[token],
                     decimal,
-                    i_priceFeedEth
+                    s_collateral.priceFeedEth
                 );
                 console.log(positiveRemainingCollateralInDecimals);
                 console.log(tokenValueInUSD);
@@ -284,6 +282,30 @@ contract Vault {
         s_debt -= _amount;
     }
 
+    function updateCollateralPortfolio(
+        address weth,
+        uint24 _poolFee
+    ) public onlyNotaryOrUser {
+        uint256 length = s_collateral.erc20s.length;
+        for (uint256 i = 0; i < length; i++) {
+            s_collateral.erc20s[i].approve(
+                address(s_portfolio),
+                s_collateral.tokenAmts[s_collateral.erc20s[i]]
+            );
+        }
+        IERC20(weth).approve(address(s_portfolio), MAX_ALLOWANCE);
+        s_portfolio.rebalancePortfolio(this, weth, _poolFee);
+        s_collateral.setFrom(
+            s_portfolio.getAssets(),
+            s_portfolio.getAmounts(),
+            s_portfolio.getDecimals(),
+            s_portfolio.getWeights(),
+            s_portfolio.getPriceFeeds()
+        );
+        s_collateral.updateWeights();
+        emit RebalanceEvent(s_portfolio.getStrategy());
+    }
+
     function retrieveCollateral(
         address _tokAddress,
         uint256 _tokAmount
@@ -299,7 +321,7 @@ contract Vault {
                         _tokAmount,
                         s_collateral.priceFeedBasket[IERC20(_tokAddress)],
                         s_collateral.decimals[IERC20(_tokAddress)],
-                        i_priceFeedEth
+                        s_collateral.priceFeedEth
                     )
                 );
         }
@@ -336,29 +358,6 @@ contract Vault {
         return
             (((_stablecoinAmount * ERC_DECIMAL) / 10 ** i_stablecoin_decimals) *
                 RATIO) / 100;
-    }
-
-    function updateCollateralPortfolio(
-        address weth,
-        uint24 _poolFee
-    ) public onlyNotaryOrUser {
-        uint256 length = s_collateral.erc20s.length;
-        for (uint256 i = 0; i < length; i++) {
-            s_collateral.erc20s[i].approve(
-                address(s_portfolio),
-                s_collateral.tokenAmts[s_collateral.erc20s[i]]
-            );
-        }
-        IERC20(weth).approve(address(s_portfolio), MAX_ALLOWANCE);
-        s_portfolio.rebalancePortfolio(this, weth, _poolFee);
-        s_collateral.setFrom(
-            s_portfolio.getAssets(),
-            s_portfolio.getAmounts(),
-            s_portfolio.getWeights(),
-            s_portfolio.getPriceFeeds()
-        );
-        s_collateral.updateWeights();
-        emit RebalanceEvent(s_portfolio.getStrategy());
     }
 
     function TotalBalanceInDecimals() public view returns (uint256) {
@@ -442,6 +441,10 @@ contract Vault {
         IERC20 token
     ) public view returns (AggregatorV3Interface) {
         return s_collateral.priceFeedBasket[token];
+    }
+
+    function getBenchmarkFeed() public view returns (AggregatorV3Interface) {
+        return s_collateral.priceFeedEth;
     }
 
     function getDebt() public view returns (uint256) {
