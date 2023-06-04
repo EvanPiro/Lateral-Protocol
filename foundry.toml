@@ -7,6 +7,7 @@ libs = ['lib']
 goerli = "${GOERLI_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
 polygon = "${MUMBAI_RPC_URL}"
+ETH_RPC_URL = "${ETH_RPC_URL}"
 
 [etherscan]
 goerli = { key = "${ETHERSCAN_API_KEY}" }
