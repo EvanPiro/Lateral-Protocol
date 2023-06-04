@@ -37,29 +37,32 @@ library PriceConverter {
 
     function getConversionRate(
         uint256 tokenAmount,
-        AggregatorV3Interface priceFeed
+        AggregatorV3Interface priceFeed,
+        uint8 decimals,
+        AggregatorV3Interface priceFeedEth
     ) internal view returns (uint256) {
         uint256 tokenPrice = getPrice(priceFeed);
-        uint256 tokenAmountInUsd = (tokenPrice * tokenAmount) /
-            1000000000000000000;
+        uint256 tokenAmountInUsd = (tokenPrice * tokenAmount * 1e18) /
+            (10 ** decimals * getPrice(priceFeedEth));
         return tokenAmountInUsd;
     }
 
     // 1000000000
     function getConversionRateOfBasket(
-        Basket storage basketOfTokens,
-        uint256 tokenAmount
+        Basket storage self,
+        AggregatorV3Interface priceFeedEth
     ) internal view returns (uint256 price) {
-        uint256 length = basketOfTokens.erc20s.length;
+        uint256 length = self.erc20s.length;
         (IERC20[] memory tokens, uint256[] memory prices) = getPriceOfBasket(
-            basketOfTokens
+            self
         );
         for (uint256 i = 0; i < length; ++i) {
-            price +=
-                (tokenAmount *
-                    basketOfTokens.weightsInPercent[tokens[i]] *
-                    prices[i]) /
-                (100 * 1000000000000000000);
+            price += getConversionRate(
+                self.tokenAmts[tokens[i]],
+                self.priceFeedBasket[tokens[i]],
+                self.decimals[tokens[i]],
+                priceFeedEth
+            );
             // or (Both will do the same thing)
             // uint256 ethAmountInUsd = (ethPrice * ethAmount) / 1e18; // 1 * 10 ** 18 == 1000000000000000000
             // the actual ETH/USD conversion rate, after adjusting the extra 0s.

@@ -19,6 +19,11 @@ import "./Notary.sol";
 contract Coin is ERC20 {
     Notary notary;
 
+    modifier onlyAuthorized() {
+        require(notary.isValidPosition(msg.sender), "Caller is not authorized");
+        _;
+    }
+
     constructor(address _notaryAddress) ERC20("Coin", "coin") {
         notary = Notary(_notaryAddress);
     }
@@ -35,7 +40,7 @@ contract Coin is ERC20 {
         address _positionAddress,
         address _receiver,
         uint256 _moreDebt
-    ) external {
+    ) external onlyAuthorized {
         // require(
         //     notary.isValidPosition(_positionAddress),
         //     "Caller is not authorized to mint"
@@ -43,7 +48,10 @@ contract Coin is ERC20 {
         _mint(_receiver, _moreDebt);
     }
 
-    function burn(address owner, uint256 _stablecoinAmount) external {
+    function burn(
+        address owner,
+        uint256 _stablecoinAmount
+    ) external onlyAuthorized {
         require(_stablecoinAmount > 0, "Invalid stablecoin amount");
 
         _burn(owner, _stablecoinAmount);

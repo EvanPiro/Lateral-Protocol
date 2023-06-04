@@ -11,11 +11,15 @@ struct Basket {
     mapping(IERC20 => uint8) decimals;
     mapping(IERC20 => uint256) weightsInPercent; // {ref/BU}
     mapping(IERC20 => AggregatorV3Interface) priceFeedBasket;
-    bool empty;
+    AggregatorV3Interface priceFeedEth;
+    bool empty; // The struct is not imported if the bool is not added (solidity bug ?)
 }
 
-/*
- * @title BasketLibP0
+/**
+ * @title BasketLibrary
+ * @author
+ * @notice This is a library that manages and implements helpful function for Basket structs
+ * @dev This functions will be used in the vault contract
  */
 library BasketLib {
     uint256 constant FIX_ZERO = 0;
@@ -49,6 +53,23 @@ library BasketLib {
         delete self.erc20s;
     }
 
+    function setFrom(
+        Basket storage self,
+        address[] memory erc20s,
+        uint256[] memory tokenAmts,
+        uint256[] memory weightsInPercent,
+        AggregatorV3Interface[] memory priceFeedBasket
+    ) internal {
+        empty(self);
+        uint256 length = erc20s.length;
+        for (uint256 i = 0; i < length; ++i) {
+            self.erc20s.push(IERC20(erc20s[i]));
+            self.tokenAmts[IERC20(erc20s[i])] = tokenAmts[i];
+            self.weightsInPercent[IERC20(erc20s[i])] = weightsInPercent[i];
+            self.priceFeedBasket[IERC20(erc20s[i])] = priceFeedBasket[i];
+        }
+    }
+
     /// Set `self` equal to `other`
     function setFrom(Basket storage self, Basket storage other) internal {
         empty(self);
@@ -65,6 +86,15 @@ library BasketLib {
         }
     }
 
+    function updateWeights(Basket storage self) internal {
+        uint256 length = self.erc20s.length;
+        for (uint256 i = 0; i < length; ++i) {
+            IERC20 _tok = self.erc20s[i];
+            self.weightsInPercent[_tok] = ((getSingleBalance(self, _tok) *
+                100) / getBasketBalance(self));
+        }
+    }
+
     /// Add `weight` to the refAmount of collateral token `tok` in the basket `self`
     // self'.refAmts[tok] = self.refAmts[tok] + weight
     // self'.erc20s is keys(self'.refAmts)
@@ -73,7 +103,6 @@ library BasketLib {
         IERC20 _tok,
         uint256 _amount,
         uint8 _decimal,
-        uint256 _weight,
         AggregatorV3Interface _priceFeed
     ) internal {
         if (_amount == FIX_ZERO) return;
@@ -81,20 +110,45 @@ library BasketLib {
             self.erc20s.push(_tok);
             self.tokenAmts[_tok] = _amount;
             self.decimals[_tok] = _decimal;
-            self.weightsInPercent[_tok] = _weight;
             self.priceFeedBasket[_tok] = _priceFeed;
         } else {
-            self.weightsInPercent[_tok] += _weight;
+            self.tokenAmts[_tok] += _amount;
         }
+        updateWeights(self);
+    }
+
+    function reduce(
+        Basket storage self,
+        IERC20 _tok,
+        uint256 _amount
+    ) internal {
+        if (_amount == FIX_ZERO) return;
+        if (self.tokenAmts[_tok] == _amount) {
+            empty(self, _tok);
+        } else {
+            self.tokenAmts[_tok] -= _amount;
+        }
+        updateWeights(self);
+    }
+
+    function Transfer(Basket storage self, address sender) internal {
+        require(self.erc20s.length > 0, "Basket is empty");
+        uint256 length = self.erc20s.length;
+        for (uint256 i = 0; i < length; ++i) {
+            self.erc20s[i].transfer(sender, self.tokenAmts[self.erc20s[i]]);
+        }
+        empty(self);
     }
 
     function getSingleBalance(
         Basket storage self,
         IERC20 token
     ) internal view returns (uint256 balance) {
-        balance = ((self.tokenAmts[token].getConversionRate(
-            self.priceFeedBasket[token]
-        ) * 1e18) / 10 ** self.decimals[token]);
+        balance = self.tokenAmts[token].getConversionRate(
+            self.priceFeedBasket[token],
+            self.decimals[token],
+            self.priceFeedEth
+        );
     }
 
     function getBasketBalance(
@@ -103,21 +157,6 @@ library BasketLib {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
             balance += getSingleBalance(self, self.erc20s[i]);
-        }
-    }
-
-    function Transfer(
-        Basket storage self,
-        address sender,
-        address positionAddress
-    ) internal {
-        require(self.erc20s.length > 0, "Basket is empty");
-        uint256 length = self.erc20s.length;
-        for (uint256 i = 0; i < length; ++i) {
-            self.erc20s[i].transfer(
-                sender,
-                self.erc20s[i].balanceOf(positionAddress)
-            );
         }
     }
 }

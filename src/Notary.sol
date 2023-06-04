@@ -24,6 +24,7 @@ contract Notary is Ownable {
 
     uint256 public immutable RATIO;
     address public coinAddress;
+    address public portfolioAddress;
 
     bool public activated;
 
@@ -40,40 +41,39 @@ contract Notary is Ownable {
      * @dev Activates the notary by providing the address of a token contract
      * that has been configured to reference this address.
      */
-    function activate(address _coinAddress) public onlyOwner {
+    function activate(
+        address _coinAddress,
+        address _portfolio
+    ) public onlyOwner {
         // @Todo check for notary address, investigate recursive implications.
         coinAddress = _coinAddress;
+        portfolioAddress = _portfolio;
         activated = true;
     }
 
     /**
      * @dev Opens a position for a specified vault owner address.
      */
-    // function openVault(
-    //     IERC20[] memory tokens,
-    //     uint8[] memory decimals,
-    //     uint256[] memory weights,
-    //     AggregatorV3Interface[] memory priceFeeds,
-    //     address ownerAddress
-    // ) public isActivated returns (address positionAddress) {
-    //     Vault vault = new Vault(
-    //         tokens,
-    //         decimals,
-    //         weights,
-    //         priceFeeds,
-    //         coinAddress,
-    //         ownerAddress,
-    //         address(this)
-    //     );
-    //     address _vaultAddress = address(vault);
+    function openVault(
+        address user,
+        address ethusd
+    ) public isActivated returns (address vaultAddress) {
+        Vault vault = new Vault(
+            coinAddress,
+            user,
+            address(this),
+            portfolioAddress,
+            ethusd
+        );
+        address _vaultAddress = address(vault);
 
-    //     isValidPosition[_vaultAddress] = true;
-    //     vaults.push(vault);
-    //     vaultID += 1;
+        isValidPosition[_vaultAddress] = true;
+        vaults.push(vault);
+        vaultID += 1;
 
-    //     emit VaultOpened(_vaultAddress);
-    //     return _vaultAddress;
-    // }
+        emit VaultOpened(_vaultAddress);
+        return _vaultAddress;
+    }
 
     function liquidateVaults() public onlyOwner {
         uint256 length = vaults.length;
