@@ -1,9 +1,26 @@
-const { tokens } = require("./tokens.js");
-
 const numeric = require("numeric");
 const axios = require("axios");
 const mathjs = require("mathjs");
 var cov = require("compute-covariance");
+
+let portfolio = {
+  tokens: {
+    GOLD: {
+      name: "Gold Token",
+      symbol: "WBTC",
+      address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+      decimals: 8,
+      priceFeedAddress: "0x5fb1616F78dA7aFC9FF79e0371741a747D2a7F22",
+    },
+    FIAT: {
+      name: "USD",
+      symbol: "LINK",
+      address: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      decimals: 18,
+      priceFeedAddress: "0x42585eD362B3f1BCa95c640FdFf35Ef899212734",
+    },
+  },
+};
 
 let returns, covMatrix;
 
@@ -15,13 +32,13 @@ async function fetchHistoricalData(assetName) {
 }
 
 async function getReturnsAndCovMatrix() {
-  const apiKey = "580f60ed-b8b7-4feb-9e4a-365bbb456439";
-  const assets = Object.values(tokens).map((token) => token.symbol);
+  // const apiKey = "580f60ed-b8b7-4feb-9e4a-365bbb456439";
+  const assets = Object.values(portfolio.tokens).map((token) => token.symbol);
 
   let prices = [];
   let minLen = Infinity;
   for (let asset of assets) {
-    const historicalData = await fetchHistoricalData(asset, apiKey);
+    const historicalData = await fetchHistoricalData(asset);
     const assetPrices = historicalData.map((quote) => Number(quote[4]));
     minLen = Math.min(minLen, assetPrices.length);
     prices.push(assetPrices);
@@ -84,29 +101,9 @@ async function calculatePortfolio() {
   let maxSrReturns = retArr[maxSharpeIdx];
   let maxSrVolatility = volArr[maxSharpeIdx];
 
-  const tokenAddresses = [];
-  const tokenWeights = [];
-  const tokenDecimals = [];
-  const priceFeedAddresses = [];
-
-  for (let token of Object.values(tokens)) {
-    tokenAddresses.push(token.address);
-    tokenDecimals.push(token.decimals);
-    priceFeedAddresses.push(token.priceFeedAddress);
-  }
-  return {
-    tokenAddresses,
-    tokenDecimals,
-    priceFeedAddresses,
-    weights: allWeights[maxSharpeIdx],
-  };
+  return allWeights[maxSharpeIdx][0] * 100;
 }
 
-calculatePortfolio().then(
-  ({ tokenAddresses, tokenDecimals, priceFeedAddresses, weights }) => {
-    console.log("Token Addresses:", tokenAddresses);
-    console.log("Token Decimals:", tokenDecimals);
-    console.log("Price Feed Addresses:", priceFeedAddresses);
-    console.log("Token Weights:", weights);
-  }
-);
+calculatePortfolio().then((firstWeight) => {
+  console.log("First Token Weight:", firstWeight);
+});
