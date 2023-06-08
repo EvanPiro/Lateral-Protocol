@@ -16,3 +16,4 @@ docs/
 
 #library files
 lib/
+node_modules/
