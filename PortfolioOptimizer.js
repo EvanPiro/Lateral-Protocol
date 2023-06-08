@@ -32,7 +32,6 @@ async function fetchHistoricalData(assetName) {
 }
 
 async function getReturnsAndCovMatrix() {
-  // const apiKey = "580f60ed-b8b7-4feb-9e4a-365bbb456439";
   const assets = Object.values(portfolio.tokens).map((token) => token.symbol);
 
   let prices = [];
