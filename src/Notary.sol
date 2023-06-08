@@ -5,6 +5,7 @@ import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "lib/chainlink/contracts/src/v0.8/interfaces/automation/KeeperCompatibleInterface.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
 import "./Vault.sol";
@@ -17,8 +18,9 @@ import "./Vault.sol";
  */
 contract Notary is Ownable {
     mapping(address => bool) public isValidPosition;
-    Vault[] public vaults;
-    uint256 vaultID;
+    address public vaultAddress;
+    // Vault[] public vaults;
+    // uint256 vaultID;
 
     event VaultOpened(address vaultAddress);
 
@@ -55,30 +57,70 @@ contract Notary is Ownable {
      * @dev Opens a position for a specified vault owner address.
      */
     function openVault(
-        address user,
-        address ethusd
-    ) public isActivated returns (address vaultAddress) {
+        address s_priceFeedBenchmark
+    ) public isActivated returns (address) {
         Vault vault = new Vault(
             coinAddress,
-            user,
             address(this),
             portfolioAddress,
-            ethusd
+            s_priceFeedBenchmark
         );
-        address _vaultAddress = address(vault);
+        vaultAddress = address(vault);
 
-        isValidPosition[_vaultAddress] = true;
-        vaults.push(vault);
-        vaultID += 1;
+        isValidPosition[vaultAddress] = true;
+        // vaults.push(vault);
+        // vaultID += 1;
 
-        emit VaultOpened(_vaultAddress);
-        return _vaultAddress;
+        emit VaultOpened(vaultAddress);
+        return vaultAddress;
+    }
+
+    // function checkUpkeep(
+    //     bytes memory /*checkData*/
+    // ) public override returns (bool upkeepNeeded, bytes memory /*performData*/) {
+
+    //     upkeepNeeded = ()
+    // }
+    // function performUpKeep()
+    // chainlink functions
+    // Portfolio rebalancing if strategy is dynamic
+    // liquidations
+
+    function updateAssetsAndPortfolio(
+        address[] memory _assetsAddress,
+        uint256[] memory _targetWeights,
+        uint8[] memory _decimals,
+        AggregatorV3Interface[] memory _priceFeeds,
+        address weth,
+        uint24 _poolFee
+    ) public onlyOwner {
+        Portfolio(portfolioAddress).updateAssets(
+            _assetsAddress,
+            _targetWeights,
+            _decimals,
+            _priceFeeds
+        );
+        Vault vault = Vault(vaultAddress);
+        uint256 numUsers = vault.getUsers().length;
+        for (uint256 j = 0; j < numUsers; j++) {
+            if (
+                vault.getStrategy(vault.getUsers()[j]) ==
+                Portfolio.STRATEGY.DYNAMIC_MODEL
+            ) {
+                vault.updateCollateralPortfolio(
+                    weth,
+                    _poolFee,
+                    vault.getUsers()[j]
+                );
+            }
+        }
     }
 
     function liquidateVaults() public onlyOwner {
-        uint256 length = vaults.length;
-        for (uint256 i = 0; i < length; i++) {
-            vaults[i].liquidate();
+        Vault vault = Vault(vaultAddress);
+        uint256 numUsers = vault.getUsers().length;
+        for (uint256 j = 0; j < numUsers; j++) {
+            vault.liquidate(vault.getUsers()[j]);
         }
     }
 }

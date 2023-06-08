@@ -80,21 +80,21 @@ contract VaultTest is Test {
         priceFeeds[1] = mockPriceFeed2;
         priceFeeds[2] = mockPriceFeed3;
 
+        vm.startPrank(address(1));
         notary = new Notary(RATIO);
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         address ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
         portfolio = new Portfolio(
-            router,
+            // router,
             ROUTERV02,
             address(notary),
             address(1)
         );
 
         notary.activate(address(coin), address(portfolio));
-        vault = Vault(
-            notary.openVault(address(1), address(mockPriceFeedETHUSD))
-        );
+        vault = Vault(notary.openVault(address(mockPriceFeedETHUSD)));
+        console.log(address(notary));
         console.log("Vault created!");
 
         amountToMint1 = 100 * 10 ** decimals[0];
@@ -103,8 +103,6 @@ contract VaultTest is Test {
         mockToken1.mint(address(1), amountToMint1);
         mockToken2.mint(address(1), amountToMint2);
         mockToken3.mint(address(1), amountToMint3);
-
-        vm.startPrank(address(1));
 
         mockToken1.approve(address(vault), INITIAL_DEPOSIT * 10 ** decimals[0]);
         mockToken2.approve(address(vault), INITIAL_DEPOSIT * 10 ** decimals[1]);
@@ -156,7 +154,7 @@ contract VaultTest is Test {
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
         vault.take(receiver, moreDebt);
-        uint256 debt = vault.getDebt();
+        uint256 debt = vault.getDebt(receiver);
         uint256 balance = coin.balanceOf(receiver);
         assertEq(debt, moreDebt);
         assertEq(balance, moreDebt);
@@ -169,22 +167,23 @@ contract VaultTest is Test {
         vault.take(receiver, moreDebt);
         uint256 balanceBefore = coin.balanceOf(receiver);
         vault.payDebt((moreDebt * 50) / 100);
-        uint256 debt = vault.getDebt();
+        uint256 debt = vault.getDebt(receiver);
         uint256 balanceAfter = coin.balanceOf(receiver);
         assertEq(debt, moreDebt / 2);
         assertEq(balanceAfter, balanceBefore / 2);
     }
 
     function testretrieveCollateral() public {
+        address receiver = address(1);
         address tokAddress = address(mockToken1);
-        uint256 tokAmount = vault.getAmounts(mockToken1) / 3;
-        uint256 weightBefore = vault.getWeights(mockToken1);
-        uint256 amountBefore = vault.getAmounts(mockToken1);
+        uint256 tokAmount = vault.getAmounts(mockToken1, receiver) / 3;
+        uint256 weightBefore = vault.getWeights(mockToken1, receiver);
+        uint256 amountBefore = vault.getAmounts(mockToken1, receiver);
         console.log(weightBefore);
 
         vault.retrieveCollateral(tokAddress, tokAmount);
-        uint256 weightAfter = vault.getWeights(mockToken1);
-        uint256 amountAfter = vault.getAmounts(mockToken1);
+        uint256 weightAfter = vault.getWeights(mockToken1, receiver);
+        uint256 amountAfter = vault.getAmounts(mockToken1, receiver);
         console.log(weightAfter);
 
         assertTrue(weightBefore > weightAfter);
@@ -196,11 +195,11 @@ contract VaultTest is Test {
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
         vault.take(receiver, moreDebt);
-        uint256 tokAmountVBefore = vault.getAmounts(mockToken1);
+        uint256 tokAmountVBefore = vault.getAmounts(mockToken1, receiver);
         uint256 tokAmountUBefore = mockToken1.balanceOf(receiver);
 
         vault.RetrieveAll();
-        uint256 tokAmountVAfter = vault.getAmounts(mockToken1);
+        uint256 tokAmountVAfter = vault.getAmounts(mockToken1, receiver);
         uint256 tokAmountUAfter = mockToken1.balanceOf(receiver);
 
         assertEq(tokAmountUAfter, tokAmountVBefore);
@@ -226,7 +225,8 @@ contract VaultTest is Test {
         T.balanceCoin2VaultBefore = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultBefore = tokens[2].balanceOf(address(vault));
 
-        vault.liquidate();
+        notary.liquidateVaults();
+        // vault.liquidate(address(1));
 
         T.balanceCoinUserAfter = coin.balanceOf(receiver);
         T.balanceCoinNotaryAfter = coin.balanceOf(address(notary));
@@ -245,9 +245,10 @@ contract VaultTest is Test {
         T.balanceCoin1VaultAfter = tokens[0].balanceOf(address(vault));
         T.balanceCoin2VaultAfter = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultAfter = tokens[2].balanceOf(address(vault));
-        uint256 penalty = (vault.getPenalty() * moreDebt) / 3;
+        uint256 penalty = ((vault.getPenalty() * moreDebt) +
+            ((vault.getRate() * moreDebt) / 86400)) / 3;
         uint256 collateralkept = (penalty *
-            10 ** vault.getDecimals(mockToken3)) /
+            10 ** vault.getDecimals(mockToken3, receiver)) /
             (100 * 10 ** vault.getStablecoinDecimals());
         console.log(collateralkept);
 
@@ -276,7 +277,7 @@ contract VaultTest is Test {
             T.balanceCoin3UserAfter / 100,
             (amountToMint3 - collateralkept) / 100
         );
-
+        console.log("Assertion");
         assertEq(T.balanceCoin1NotaryAfter, 0);
         assertEq(T.balanceCoin2NotaryAfter, 0);
         assertEq(T.balanceCoin3NotaryAfter / 100, collateralkept / 100);

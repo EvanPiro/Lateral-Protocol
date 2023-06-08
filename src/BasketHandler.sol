@@ -11,7 +11,6 @@ struct Basket {
     mapping(IERC20 => uint8) decimals;
     mapping(IERC20 => uint256) weightsInPercent; // {ref/BU}
     mapping(IERC20 => AggregatorV3Interface) priceFeedBasket;
-    AggregatorV3Interface priceFeedEth;
     bool empty; // The struct is not imported if the bool is not added (solidity bug ?)
 }
 
@@ -88,12 +87,18 @@ library BasketLib {
         }
     }
 
-    function updateWeights(Basket storage self) internal {
+    function updateWeights(
+        Basket storage self,
+        AggregatorV3Interface _priceFeedBenchmark
+    ) internal {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
             IERC20 _tok = self.erc20s[i];
-            self.weightsInPercent[_tok] = ((getSingleBalance(self, _tok) *
-                100) / getBasketBalance(self));
+            self.weightsInPercent[_tok] = ((getSingleBalance(
+                self,
+                _tok,
+                _priceFeedBenchmark
+            ) * 100) / getBasketBalance(self, _priceFeedBenchmark));
         }
     }
 
@@ -105,7 +110,8 @@ library BasketLib {
         IERC20 _tok,
         uint256 _amount,
         uint8 _decimal,
-        AggregatorV3Interface _priceFeed
+        AggregatorV3Interface _priceFeed,
+        AggregatorV3Interface _priceFeedBenchmark
     ) internal {
         if (_amount == FIX_ZERO) return;
         if (self.tokenAmts[_tok] == FIX_ZERO) {
@@ -116,13 +122,14 @@ library BasketLib {
         } else {
             self.tokenAmts[_tok] += _amount;
         }
-        updateWeights(self);
+        updateWeights(self, _priceFeedBenchmark);
     }
 
     function reduce(
         Basket storage self,
         IERC20 _tok,
-        uint256 _amount
+        uint256 _amount,
+        AggregatorV3Interface _priceFeedBenchmark
     ) internal {
         if (_amount == FIX_ZERO) return;
         if (self.tokenAmts[_tok] == _amount) {
@@ -130,7 +137,7 @@ library BasketLib {
         } else {
             self.tokenAmts[_tok] -= _amount;
         }
-        updateWeights(self);
+        updateWeights(self, _priceFeedBenchmark);
     }
 
     function Transfer(Basket storage self, address sender) internal {
@@ -144,21 +151,27 @@ library BasketLib {
 
     function getSingleBalance(
         Basket storage self,
-        IERC20 token
+        IERC20 token,
+        AggregatorV3Interface _priceFeedBenchmark
     ) internal view returns (uint256 balance) {
         balance = self.tokenAmts[token].getConversionRate(
             self.priceFeedBasket[token],
             self.decimals[token],
-            self.priceFeedEth
+            _priceFeedBenchmark
         );
     }
 
     function getBasketBalance(
-        Basket storage self
+        Basket storage self,
+        AggregatorV3Interface _priceFeedBenchmark
     ) internal view returns (uint256 balance) {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
-            balance += getSingleBalance(self, self.erc20s[i]);
+            balance += getSingleBalance(
+                self,
+                self.erc20s[i],
+                _priceFeedBenchmark
+            );
         }
     }
 }

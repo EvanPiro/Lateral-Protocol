@@ -5,13 +5,15 @@ pragma solidity ^0.8.0;
 
 import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "lib/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./Notary.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
 import "./Vault.sol";
 
-contract Portfolio {
+contract Portfolio is Ownable {
     enum STRATEGY {
+        NONE,
         FIXED_MODEL,
         DYNAMIC_MODEL
     }
@@ -20,13 +22,13 @@ contract Portfolio {
     uint256[] private s_tokenAmounts;
     uint256[] private s_targetWeights;
     uint8[] private s_decimals;
-    STRATEGY private s_strategy;
+    mapping(address => STRATEGY) private s_strategy;
     AggregatorV3Interface[] public s_priceFeeds;
 
     uint160 internal constant MAX_SQRT_RATIO =
         1461446703485210103287273052203988822378723970342;
     uint160 internal constant MIN_SQRT_RATIO = 4295128739;
-    ISwapRouter immutable i_router;
+    // ISwapRouter immutable i_router;
     IUniswapV2Router02 immutable i_routerV2;
     address immutable i_notary;
     address immutable i_dev;
@@ -43,14 +45,6 @@ contract Portfolio {
         _;
     }
 
-    modifier onlyNotaryOrDev() {
-        require(
-            msg.sender == i_notary || msg.sender == i_dev,
-            "Only the notary or developer can call this function"
-        );
-        _;
-    }
-
     modifier onlyAuthorized() {
         require(
             Notary(i_notary).isValidPosition(msg.sender),
@@ -60,12 +54,12 @@ contract Portfolio {
     }
 
     constructor(
-        address _uniswapV3Router, // IERC20[] memory tokens, // uint8[] memory decimals, // uint256[] memory weights, // AggregatorV3Interface[] memory priceFeeds
+        // address _uniswapV3Router, // IERC20[] memory tokens, // uint8[] memory decimals, // uint256[] memory weights, // AggregatorV3Interface[] memory priceFeeds
         address _uniswapV2Router,
         address _notaryAddress,
         address dev
     ) {
-        i_router = ISwapRouter(_uniswapV3Router);
+        // i_router = ISwapRouter(_uniswapV3Router);
         i_routerV2 = IUniswapV2Router02(_uniswapV2Router);
         i_notary = _notaryAddress;
         i_dev = dev;
@@ -74,14 +68,12 @@ contract Portfolio {
         // }
     }
 
-    function updateStrategy(uint256 strategy) public {}
-
     function updateAssets(
         address[] memory _assetsAddress,
         uint256[] memory _targetWeights,
         uint8[] memory _decimals,
         AggregatorV3Interface[] memory _priceFeeds
-    ) public onlyNotaryOrDev {
+    ) public onlyNotary {
         s_assetsAddress = _assetsAddress;
         s_targetWeights = _targetWeights;
         s_priceFeeds = _priceFeeds;
@@ -114,30 +106,30 @@ contract Portfolio {
         return amounts[1];
     }
 
-    function swapExactInputSingleHop(
-        address tokenIn,
-        address tokenOut,
-        uint24 poolFee,
-        uint amountIn,
-        bool zeroForOne
-    ) internal returns (uint amountOut) {
-        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
-        IERC20(tokenIn).approve(address(i_router), amountIn);
+    // function swapExactInputSingleHop(
+    //     address tokenIn,
+    //     address tokenOut,
+    //     uint24 poolFee,
+    //     uint amountIn,
+    //     bool zeroForOne
+    // ) internal returns (uint amountOut) {
+    //     IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+    //     IERC20(tokenIn).approve(address(i_router), amountIn);
 
-        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
-            .ExactInputSingleParams({
-                tokenIn: tokenIn,
-                tokenOut: tokenOut,
-                fee: poolFee,
-                recipient: msg.sender,
-                deadline: block.timestamp,
-                amountIn: amountIn,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: getSqrtPriceLimitX96(zeroForOne)
-            });
+    //     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+    //         .ExactInputSingleParams({
+    //             tokenIn: tokenIn,
+    //             tokenOut: tokenOut,
+    //             fee: poolFee,
+    //             recipient: msg.sender,
+    //             deadline: block.timestamp,
+    //             amountIn: amountIn,
+    //             amountOutMinimum: 0,
+    //             sqrtPriceLimitX96: getSqrtPriceLimitX96(zeroForOne)
+    //         });
 
-        amountOut = i_router.exactInputSingle(params);
-    }
+    //     amountOut = i_router.exactInputSingle(params);
+    // }
 
     function calculateTargetInputs(
         uint256 totalAmountInDecimals,
@@ -155,25 +147,37 @@ contract Portfolio {
     function rebalancePortfolio(
         Vault vault,
         address weth,
-        uint24 _poolFee
+        uint24 _poolFee,
+        address _user
     ) external onlyAuthorized {
-        uint256 length = vault.getTokens().length;
+        uint256 length = vault.getTokens(_user).length;
         // Rebalance the portfolio by swapping assets
+        uint256 wethAmount;
         for (uint256 i = 0; i < length; i++) {
-            if (address(vault.getTokens()[i]) == weth) {
+            if (address(vault.getTokens(_user)[i]) == weth) {
+                wethAmount += vault.getAmounts(
+                    vault.getTokens(_user)[i],
+                    _user
+                );
                 continue;
             } else {
-                swapExactInputSingleHop(
-                    address(vault.getTokens()[i]),
+                // swapExactInputSingleHop(
+                //     address(vault.getTokens(_user)[i]),
+                //     weth,
+                //     _poolFee,
+                //     vault.getAmounts(vault.getTokens(_user)[i], _user),
+                //     true
+                // );
+                wethAmount += swapSingleHopExactAmountInV2(
+                    address(vault.getTokens(_user)[i]),
                     weth,
-                    _poolFee,
-                    vault.getAmounts(vault.getTokens()[i]),
-                    true
+                    vault.getAmounts(vault.getTokens(_user)[i], _user),
+                    0
                 );
             }
         }
         uint256[] memory targetAmountsInDecimals = calculateTargetInputs(
-            IERC20(weth).balanceOf(msg.sender),
+            wethAmount,
             s_targetWeights
         );
 
@@ -204,17 +208,17 @@ contract Portfolio {
             s_assetsAddress.push(weth);
             s_targetWeights.push(1);
             s_decimals.push(18);
-            s_priceFeeds.push(vault.getBenchmarkFeed());
+            s_priceFeeds.push(vault.getBenchmarkFeed(_user));
         }
 
-        uint256 lengthV = vault.getTokens().length;
+        uint256 lengthV = vault.getTokens(_user).length;
         for (uint256 i = 0; i < lengthV; ++i) {
-            uint256 token1Balance = IERC20(vault.getTokens()[i]).balanceOf(
+            uint256 token1Balance = IERC20(vault.getTokens(_user)[i]).balanceOf(
                 address(vault)
             );
             // console.log("************");
             // console.log(token1Balance);
-            if (address(vault.getTokens()[i]) != weth) {
+            if (address(vault.getTokens(_user)[i]) != weth) {
                 // uint256 token1Balance = IERC20(vault.getTokens()[i]).balanceOf(
                 //     address(vault)
                 // );
@@ -222,11 +226,13 @@ contract Portfolio {
                 // console.log(token1Balance);
                 if (token1Balance > 0) {
                     s_tokenAmounts.push(token1Balance);
-                    s_assetsAddress.push(address(vault.getTokens()[i]));
+                    s_assetsAddress.push(address(vault.getTokens(_user)[i]));
                     s_targetWeights.push(1);
-                    s_decimals.push(vault.getDecimals(vault.getTokens()[i]));
+                    s_decimals.push(
+                        vault.getDecimals(vault.getTokens(_user)[i], _user)
+                    );
                     s_priceFeeds.push(
-                        vault.getPriceFeeds(vault.getTokens()[i])
+                        vault.getPriceFeeds(vault.getTokens(_user)[i], _user)
                     );
                 }
             }
@@ -261,9 +267,5 @@ contract Portfolio {
         returns (AggregatorV3Interface[] memory)
     {
         return s_priceFeeds;
-    }
-
-    function getStrategy() public view returns (STRATEGY) {
-        return s_strategy;
     }
 }
