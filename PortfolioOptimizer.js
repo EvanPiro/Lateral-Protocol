@@ -103,6 +103,9 @@ async function calculatePortfolio() {
   return allWeights[maxSharpeIdx][0] * 100;
 }
 
-calculatePortfolio().then((firstWeight) => {
+async function main() {
+  const firstWeight = await calculatePortfolio();
   console.log("First Token Weight:", firstWeight);
-});
+}
+
+main();
