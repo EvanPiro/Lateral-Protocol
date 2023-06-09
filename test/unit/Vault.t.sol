@@ -81,7 +81,9 @@ contract VaultTest is Test {
         priceFeeds[2] = mockPriceFeed3;
 
         vm.startPrank(address(1));
-        notary = new Notary(RATIO);
+
+        // @Todo set up mock functionsOracleProxyAddress contract
+        notary = new Notary(RATIO, address(11));
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         address ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;

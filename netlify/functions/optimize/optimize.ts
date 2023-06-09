@@ -101,7 +101,7 @@ async function calculatePortfolio() {
 
   let maxSharpeIdx = sharpeArr.indexOf(Math.max(...sharpeArr));
 
-  return allWeights[maxSharpeIdx][0] * 100;
+  return parseInt(allWeights[maxSharpeIdx][0] * 100);
 }
 
 export const handler: Handler = async (event, context) => {

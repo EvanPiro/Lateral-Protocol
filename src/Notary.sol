@@ -9,6 +9,7 @@ import "lib/chainlink/contracts/src/v0.8/interfaces/automation/KeeperCompatibleI
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
 import "./Vault.sol";
+import "lib/chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol";
 
 /**
  * @dev Notary contract registers and authenticates Positions.
@@ -16,7 +17,7 @@ import "./Vault.sol";
  * This contract allows users to open positions, which can be verified
  * during the minting of the stablecoin.
  */
-contract Notary is Ownable, KeeperCompatibleInterface {
+contract Notary is Ownable, KeeperCompatibleInterface, FunctionsClient {
     mapping(address => bool) public isValidPosition;
     address public vaultAddress;
     // Vault[] public vaults;
@@ -37,7 +38,7 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         _;
     }
 
-    constructor(uint256 _minRatio) {
+    constructor(uint256 _minRatio, address _oracleAddress) FunctionsClient(_oracleAddress) {
         RATIO = _minRatio;
         s_lastTimeStamp = block.timestamp;
         i_interval = 30;
@@ -105,14 +106,24 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         //call execute requests
     }
 
-    function fullfillrequest(uint256 result) public {
-        uint256 weight = result;
+    /**
+ * @notice User defined function to handle a response
+   * @param requestId The request ID, returned by sendRequest()
+   * @param response Aggregated response from the user code
+   * @param err Aggregated error from the user code or from the execution pipeline
+   * Either response or error parameter will be set, but never both
+   */
+    function fulfillRequest(
+        bytes32 requestId,
+        bytes memory response,
+        bytes memory err
+    ) internal override {
+        uint256 weight = uint256(bytes32(response));
         uint256[2] memory _targetWeights;
         _targetWeights[0] = weight;
         _targetWeights[1] = 1 - weight;
-
-        // updateAssetsAndPortfolioTestnet(_targetWeights);
     }
+
 
     // perform upkeep -> execute request
     // fulfill request -> updateAssetsAndPortfolio

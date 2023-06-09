@@ -71,7 +71,8 @@ contract UniV3Test is Test {
     function setUp() public {
         vm.startPrank(address(1));
 
-        notary = new Notary(RATIO);
+        // @Todo set up mock functionsOracleProxyAddress contract
+        notary = new Notary(RATIO, address(11));
         Coin coin = new Coin(address(notary));
         Portfolio portfolio = new Portfolio(ROUTERV02, address(notary));
         notary.activate(address(coin), address(portfolio));
