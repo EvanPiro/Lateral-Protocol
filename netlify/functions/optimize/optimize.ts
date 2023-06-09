@@ -2,20 +2,20 @@ import { Handler } from "@netlify/functions";
 import * as numeric from "numeric";
 import axios from "axios";
 import * as mathjs from "mathjs";
-import { cov } from "compute-covariance";
+import * as computeCovariance from "compute-covariance";
 
-const portfolio = {
+let portfolio = {
   tokens: {
     GOLD: {
       name: "Gold Token",
-      symbol: "WBTC",
+      symbol: "bitcoin", // This is Bitcoin on CoinGecko
       address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
       decimals: 8,
       priceFeedAddress: "0x5fb1616F78dA7aFC9FF79e0371741a747D2a7F22",
     },
     FIAT: {
       name: "USD",
-      symbol: "LINK",
+      symbol: "ethereum", // This is ethereum on CoinGecko
       address: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
       decimals: 18,
       priceFeedAddress: "0x42585eD362B3f1BCa95c640FdFf35Ef899212734",
@@ -28,23 +28,25 @@ let returns, covMatrix;
 async function fetchHistoricalData(assetName) {
   // Binance API endpoint for candlestick data
   console.log(assetName);
-  const url = `https://api.binance.com/api/v3/klines?symbol=${assetName}USDT&interval=1d&limit=1000`;
-  console.log(url);
+  const url = `https://api.coingecko.com/api/v3/coins/${assetName}/market_chart?vs_currency=usd&days=90`;
   const response = await axios.get(url);
-  return response.data;
+
+  const prices = response.data.prices;
+
+  const closingPrices = prices.map((entry) => entry[1]);
+
+  return closingPrices;
 }
 
 async function getReturnsAndCovMatrix() {
   const assets = Object.values(portfolio.tokens).map((token) => token.symbol);
-  console.log(assets);
 
   let prices = [];
   let minLen = Infinity;
   for (let asset of assets) {
     const historicalData = await fetchHistoricalData(asset);
-    const assetPrices = historicalData.map((quote) => Number(quote[4]));
-    minLen = Math.min(minLen, assetPrices.length);
-    prices.push(assetPrices);
+    minLen = Math.min(minLen, historicalData.length);
+    prices.push(historicalData);
   }
   // Trim all price arrays to the same length
   prices = prices.map((assetPrices) => assetPrices.slice(0, minLen));
