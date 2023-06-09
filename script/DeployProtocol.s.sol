@@ -34,7 +34,6 @@ contract DeployProtocol is Script {
         address portfolioAddress = address(portfolio);
 
         WeightProvider weightProvider = new WeightProvider(functionsOracleProxyAddress, address(notary));
-
         address weightProviderAddress = address(weightProvider);
 
         notary.activate(coinAddress, portfolioAddress, weightProviderAddress);

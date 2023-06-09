@@ -12,6 +12,9 @@ import {Notary} from "./Notary.sol";
  */
 contract WeightProvider is FunctionsClient {
 
+    string public source = "var b=await Functions.makeHttpRequest({url:'https://www.signdb.com/.netlify/functions/optimize'});return Functions.encodeUint256(Math.round(b.data['weight']));";
+
+
     Notary notary;
 
     constructor(address _oracleAddress, address _notaryAddress) FunctionsClient(_oracleAddress) {
