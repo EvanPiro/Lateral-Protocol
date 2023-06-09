@@ -70,7 +70,10 @@ contract UniV3Test is Test {
         notary = new Notary(RATIO);
         Coin coin = new Coin(address(notary));
         Portfolio portfolio = new Portfolio(ROUTERV02, address(notary));
-        WeightProvider weightProvider = new WeightProvider(functionsOracleAddress, address(notary));
+        WeightProvider weightProvider = new WeightProvider(
+            functionsOracleAddress,
+            address(notary)
+        );
 
         notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(ETHUSD));

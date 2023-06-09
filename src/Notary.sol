@@ -13,7 +13,7 @@ import "lib/chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol";
  * This contract allows users to open positions, which can be verified
  * during the minting of the stablecoin.
  */
-contract Notary is Ownable, KeeperCompatibleInterface {
+contract Notary is Ownable {
     mapping(address => bool) public isValidPosition;
     address public vaultAddress;
     // Vault[] public vaults;
@@ -79,31 +79,31 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         return vaultAddress;
     }
 
-    function checkUpkeep(
-        bytes memory /*checkData*/
-    )
-        public
-        override
-        returns (bool upkeepNeeded, bytes memory /*performData*/)
-    {
-        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
-        bool hasUsers = (Vault(vaultAddress).getUsers().length > 0);
-        upkeepNeeded = (timePassed && hasUsers);
-        //         upkeepNeeded boolean to indicate whether the keeper should call
-        //    * performUpkeep or not.
-    }
+    // function checkUpkeep(
+    //     bytes memory /*checkData*/
+    // )
+    //     public
+    //     override
+    //     returns (bool upkeepNeeded, bytes memory /*performData*/)
+    // {
+    //     bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+    //     bool hasUsers = (Vault(vaultAddress).getUsers().length > 0);
+    //     upkeepNeeded = (timePassed && hasUsers);
+    //     //         upkeepNeeded boolean to indicate whether the keeper should call
+    //     //    * performUpkeep or not.
+    // }
 
-    function performUpkeep(bytes calldata /*performData*/) external override {
-        // Request the random number
-        // Once we get it, do something with it
-        // 2 transaction process
-        (bool upkeepNeeded, ) = checkUpkeep("");
-        if (!upkeepNeeded) {}
+    // function performUpkeep(bytes calldata /*performData*/) external override {
+    //     // Request the random number
+    //     // Once we get it, do something with it
+    //     // 2 transaction process
+    //     (bool upkeepNeeded, ) = checkUpkeep("");
+    //     if (!upkeepNeeded) {}
 
-        liquidateVaults();
+    //     liquidateVaults();
 
-        //call execute requests
-    }
+    //     //call execute requests
+    // }
 
     // perform upkeep -> execute request
     // fulfill request -> updateAssetsAndPortfolio
@@ -114,10 +114,7 @@ contract Notary is Ownable, KeeperCompatibleInterface {
     // liquidations
 
     function updateAssetsAndPortfolioTestnet(
-        // address[] memory _assetsAddress,
         uint256[] memory _targetWeights,
-        // uint8[] memory _decimals,
-        // AggregatorV3Interface[] memory _priceFeeds,
         address weth,
         uint24 _poolFee
     ) public onlyOwner {
@@ -138,14 +135,12 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         }
     }
 
-    function updateAssetsAndPortfolio(
+    function updateAssets(
         address[] memory _assetsAddress,
         uint256[] memory _targetWeights,
         uint8[] memory _decimals,
         AggregatorV3Interface[] memory _priceFeeds,
-        string[] memory _baseCurrencies,
-        address weth,
-        uint24 _poolFee
+        string[] memory _baseCurrencies
     ) public onlyOwner {
         Portfolio(portfolioAddress).updateAssets(
             _assetsAddress,
@@ -154,6 +149,9 @@ contract Notary is Ownable, KeeperCompatibleInterface {
             _priceFeeds,
             _baseCurrencies
         );
+    }
+
+    function updatePortfolio(address weth, uint24 _poolFee) public onlyOwner {
         Vault vault = Vault(vaultAddress);
         uint256 numUsers = vault.getUsers().length;
         for (uint256 j = 0; j < numUsers; j++) {

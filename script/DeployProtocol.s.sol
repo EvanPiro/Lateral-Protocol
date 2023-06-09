@@ -36,7 +36,10 @@ contract DeployProtocol is Script {
         Portfolio portfolio = new Portfolio(uniswapV2Router, notaryAddress);
         address portfolioAddress = address(portfolio);
 
-        WeightProvider weightProvider = new WeightProvider(functionsOracleProxyAddress, address(notary));
+        WeightProvider weightProvider = new WeightProvider(
+            functionsOracleProxyAddress,
+            address(notary)
+        );
         address weightProviderAddress = address(weightProvider);
 
         notary.activate(coinAddress, portfolioAddress, weightProviderAddress);

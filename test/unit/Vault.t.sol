@@ -97,7 +97,10 @@ contract VaultTest is Test {
             address(notary)
         );
 
-        WeightProvider weightProvider = new WeightProvider(functionsOracleAddress, address(notary));
+        WeightProvider weightProvider = new WeightProvider(
+            functionsOracleAddress,
+            address(notary)
+        );
 
         notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(address(mockPriceFeedETHUSD)));
@@ -222,7 +225,7 @@ contract VaultTest is Test {
         T.balanceCoin2VaultBefore = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultBefore = tokens[2].balanceOf(address(vault));
 
-        //        notary.liquidateVaults();
+        notary.liquidateVaults();
         // vault.liquidate(address(1));
 
         T.balanceCoinUserAfter = coin.balanceOf(receiver);
@@ -242,7 +245,7 @@ contract VaultTest is Test {
         T.balanceCoin1VaultAfter = tokens[0].balanceOf(address(vault));
         T.balanceCoin2VaultAfter = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultAfter = tokens[2].balanceOf(address(vault));
-        uint256 penalty = ((vault.getPenalty() * moreDebt) + ((vault.getRate() * moreDebt) / 86400)) / 3;
+        uint256 penalty = ((vault.getPenalty() * moreDebt)) / 3;
         uint256 collateralkept =
             (penalty * 10 ** vault.getDecimals(mockToken3, receiver)) / (100 * 10 ** vault.getStablecoinDecimals());
         console.log(collateralkept);
