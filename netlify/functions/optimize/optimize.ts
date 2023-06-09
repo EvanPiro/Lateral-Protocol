@@ -2,7 +2,7 @@ import { Handler } from "@netlify/functions";
 import * as numeric from "numeric";
 import axios from "axios";
 import * as mathjs from "mathjs";
-import * as computeCovariance from "compute-covariance";
+import covariance from "compute-covariance";
 
 let portfolio = {
   tokens: {
@@ -60,7 +60,7 @@ async function getReturnsAndCovMatrix() {
     return assetReturns;
   });
 
-  const covMatrix = cov(returns);
+  const covMatrix = covariance(returns);
 
   // Return both returns and covariance matrix
   return { returns, covMatrix };
