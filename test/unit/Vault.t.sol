@@ -88,8 +88,7 @@ contract VaultTest is Test {
         portfolio = new Portfolio(
             // router,
             ROUTERV02,
-            address(notary),
-            address(1)
+            address(notary)
         );
 
         notary.activate(address(coin), address(portfolio));

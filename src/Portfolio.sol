@@ -31,7 +31,6 @@ contract Portfolio is Ownable {
     // ISwapRouter immutable i_router;
     IUniswapV2Router02 immutable i_routerV2;
     address immutable i_notary;
-    address immutable i_dev;
 
     event RebalanceEvent(STRATEGY strategy);
 
@@ -54,15 +53,12 @@ contract Portfolio is Ownable {
     }
 
     constructor(
-        // address _uniswapV3Router, // IERC20[] memory tokens, // uint8[] memory decimals, // uint256[] memory weights, // AggregatorV3Interface[] memory priceFeeds
         address _uniswapV2Router,
-        address _notaryAddress,
-        address dev
+        address _notaryAddress
     ) {
         // i_router = ISwapRouter(_uniswapV3Router);
         i_routerV2 = IUniswapV2Router02(_uniswapV2Router);
         i_notary = _notaryAddress;
-        i_dev = dev;
         // for (uint256 i = 0; i < length; ++i) {
         //     targetAssets.add(tokens[i], decimals[i], weights[i], priceFeeds[i]);
         // }

@@ -75,8 +75,7 @@ contract UniV3Test is Test {
         Coin coin = new Coin(address(notary));
         Portfolio portfolio = new Portfolio(
             ROUTERV02,
-            address(notary),
-            address(1)
+            address(notary)
         );
         notary.activate(address(coin), address(portfolio));
         vault = Vault(notary.openVault(ETHUSD));

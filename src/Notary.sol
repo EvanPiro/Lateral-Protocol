@@ -81,6 +81,11 @@ contract Notary is Ownable {
 
     //     upkeepNeeded = ()
     // }
+
+
+    // perform upkeep -> execute request
+    // fulfill request -> updateAssetsAndPortfolio
+    // fulfill request will pass the ratio to updateAssetsAndPortfolio
     // function performUpKeep()
     // chainlink functions
     // Portfolio rebalancing if strategy is dynamic
