@@ -3,11 +3,7 @@ pragma solidity ^0.8.0;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
-import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "lib/chainlink/contracts/src/v0.8/interfaces/automation/KeeperCompatibleInterface.sol";
-import "./BasketHandler.sol";
-import "./PriceConverter.sol";
 import "./Vault.sol";
 
 /**
@@ -47,10 +43,7 @@ contract Notary is Ownable, KeeperCompatibleInterface {
      * @dev Activates the notary by providing the address of a token contract
      * that has been configured to reference this address.
      */
-    function activate(
-        address _coinAddress,
-        address _portfolio
-    ) public onlyOwner {
+    function activate(address _coinAddress, address _portfolio) public onlyOwner {
         // @Todo check for notary address, investigate recursive implications.
         coinAddress = _coinAddress;
         portfolioAddress = _portfolio;
@@ -60,9 +53,7 @@ contract Notary is Ownable, KeeperCompatibleInterface {
     /**
      * @dev Opens a position for a specified vault owner address.
      */
-    function openVault(
-        address s_priceFeedBenchmark
-    ) public isActivated returns (address) {
+    function openVault(address s_priceFeedBenchmark) public isActivated returns (address) {
         Vault vault = new Vault(
             coinAddress,
             address(this),
@@ -79,12 +70,10 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         return vaultAddress;
     }
 
-    function checkUpkeep(
-        bytes memory /*checkData*/
-    )
+    function checkUpkeep(bytes memory /*checkData*/ )
         public
         override
-        returns (bool upkeepNeeded, bytes memory /*performData*/)
+        returns (bool upkeepNeeded, bytes memory /*performData*/ )
     {
         bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
         bool hasUsers = (Vault(vaultAddress).getUsers().length > 0);
@@ -93,11 +82,11 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         //    * performUpkeep or not.
     }
 
-    function performUpkeep(bytes calldata /*performData*/) external override {
+    function performUpkeep(bytes calldata /*performData*/ ) external override {
         // Request the random number
         // Once we get it, do something with it
         // 2 transaction process
-        (bool upkeepNeeded, ) = checkUpkeep("");
+        (bool upkeepNeeded,) = checkUpkeep("");
         if (!upkeepNeeded) {}
 
         liquidateVaults();
@@ -134,15 +123,8 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         Vault vault = Vault(vaultAddress);
         uint256 numUsers = vault.getUsers().length;
         for (uint256 j = 0; j < numUsers; j++) {
-            if (
-                vault.getStrategy(vault.getUsers()[j]) ==
-                Portfolio.STRATEGY.DYNAMIC_MODEL
-            ) {
-                vault.updateCollateralPortfolio(
-                    weth,
-                    _poolFee,
-                    vault.getUsers()[j]
-                );
+            if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
+                vault.updateCollateralPortfolio(weth, _poolFee, vault.getUsers()[j]);
             }
         }
     }
@@ -152,27 +134,18 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         uint256[] memory _targetWeights,
         uint8[] memory _decimals,
         AggregatorV3Interface[] memory _priceFeeds,
+        string[] memory _baseCurrencies,
         address weth,
         uint24 _poolFee
     ) public onlyOwner {
         Portfolio(portfolioAddress).updateAssets(
-            _assetsAddress,
-            _targetWeights,
-            _decimals,
-            _priceFeeds
+            _assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies
         );
         Vault vault = Vault(vaultAddress);
         uint256 numUsers = vault.getUsers().length;
         for (uint256 j = 0; j < numUsers; j++) {
-            if (
-                vault.getStrategy(vault.getUsers()[j]) ==
-                Portfolio.STRATEGY.DYNAMIC_MODEL
-            ) {
-                vault.updateCollateralPortfolio(
-                    weth,
-                    _poolFee,
-                    vault.getUsers()[j]
-                );
+            if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
+                vault.updateCollateralPortfolio(weth, _poolFee, vault.getUsers()[j]);
             }
         }
     }

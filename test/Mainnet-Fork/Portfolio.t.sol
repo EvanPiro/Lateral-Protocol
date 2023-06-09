@@ -37,27 +37,19 @@ contract UniV3Test is Test {
     IERC20 private paxg = IERC20(PAXG);
     IERC20 private link = IERC20(LINK);
 
-    AggregatorV3Interface private priceFeedEthUsd =
-        AggregatorV3Interface(ETHUSD);
-    AggregatorV3Interface private priceFeedDaiEth =
-        AggregatorV3Interface(DAIETH);
-    AggregatorV3Interface private priceFeedBtcEth =
-        AggregatorV3Interface(BTCETH);
-    AggregatorV3Interface private priceFeedUsdEth =
-        AggregatorV3Interface(USDCETH);
-    AggregatorV3Interface private priceFeedPaxGeth =
-        AggregatorV3Interface(PAXGETH);
-    AggregatorV3Interface private priceFeedLinkEth =
-        AggregatorV3Interface(LINKETH);
+    AggregatorV3Interface private priceFeedEthUsd = AggregatorV3Interface(ETHUSD);
+    AggregatorV3Interface private priceFeedDaiEth = AggregatorV3Interface(DAIETH);
+    AggregatorV3Interface private priceFeedBtcEth = AggregatorV3Interface(BTCETH);
+    AggregatorV3Interface private priceFeedUsdEth = AggregatorV3Interface(USDCETH);
+    AggregatorV3Interface private priceFeedPaxGeth = AggregatorV3Interface(PAXGETH);
+    AggregatorV3Interface private priceFeedLinkEth = AggregatorV3Interface(LINKETH);
 
     address[] _assetsAddress = [PAXG, USDC, WBTC];
     uint256[] _targetWeights = [40, 40, 20];
     uint8[] _decimals = [PAXGdecimals, USDCdecimals, WBTCdecimals];
-    AggregatorV3Interface[] _priceFeeds = [
-        priceFeedPaxGeth,
-        priceFeedUsdEth,
-        priceFeedBtcEth
-    ];
+    AggregatorV3Interface[] _priceFeeds = [priceFeedPaxGeth, priceFeedUsdEth, priceFeedBtcEth];
+
+    string[] _baseCurrencies = ["ETH", "ETH", "ETH"];
 
     uint256 public constant INITIAL_DEPOSIT = 100;
     uint256 public constant RATIO = 150;
@@ -90,24 +82,9 @@ contract UniV3Test is Test {
         dai.approve(address(vault), amountToMint2);
         link.approve(address(vault), amountToMint3);
 
-        vault.addOneCollateral(
-            address(weth),
-            amountToMint1,
-            WETHdecimals,
-            priceFeedEthUsd
-        );
-        vault.addOneCollateral(
-            address(dai),
-            amountToMint2,
-            DAIdecimals,
-            priceFeedDaiEth
-        );
-        vault.addOneCollateral(
-            address(link),
-            amountToMint3,
-            LINKdecimals,
-            priceFeedLinkEth
-        );
+        vault.addOneCollateral(address(weth), amountToMint1, WETHdecimals, address(priceFeedEthUsd), "USD");
+        vault.addOneCollateral(address(dai), amountToMint2, DAIdecimals, address(priceFeedDaiEth), "ETH");
+        vault.addOneCollateral(address(link), amountToMint3, LINKdecimals, address(priceFeedLinkEth), "ETH");
 
         vault.updateStrategy(2);
 
@@ -121,12 +98,7 @@ contract UniV3Test is Test {
 
     function testupdateCollateralPortfolio() public {
         notary.updateAssetsAndPortfolio(
-            _assetsAddress,
-            _targetWeights,
-            _decimals,
-            _priceFeeds,
-            WETH,
-            3000
+            _assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies, WETH, 3000
         );
         address receiver = address(1);
         // vault.updateCollateralPortfolio(WETH, 3000);
@@ -146,11 +118,11 @@ contract UniV3Test is Test {
         console.log(vault.getAmounts(vault.getTokens(receiver)[2], receiver));
         console.log(vault.getDecimals(vault.getTokens(receiver)[2], receiver));
 
-        console.log("------");
-        console.log(address(vault.getTokens(receiver)[3]));
-        console.log(vault.getWeights(vault.getTokens(receiver)[3], receiver));
-        console.log(vault.getAmounts(vault.getTokens(receiver)[3], receiver));
-        console.log(vault.getDecimals(vault.getTokens(receiver)[3], receiver));
+        // console.log("------");
+        // console.log(address(vault.getTokens(receiver)[3]));
+        // console.log(vault.getWeights(vault.getTokens(receiver)[3], receiver));
+        // console.log(vault.getAmounts(vault.getTokens(receiver)[3], receiver));
+        // console.log(vault.getDecimals(vault.getTokens(receiver)[3], receiver));
 
         // console.log("------");
         // console.log(address(vault.getTokens()[4]));

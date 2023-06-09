@@ -111,7 +111,7 @@ async function calculatePortfolio() {
   let maxSrReturns = retArr[maxSharpeIdx];
   let maxSrVolatility = volArr[maxSharpeIdx];
 
-  return allWeights[maxSharpeIdx][0] * 100;
+  return parseInt(allWeights[maxSharpeIdx][0] * 100);
 }
 
 async function main() {

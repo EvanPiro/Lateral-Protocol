@@ -25,6 +25,7 @@ contract VaultTest is Test {
     uint256 public amountToMint1;
     uint256 public amountToMint2;
     uint256 public amountToMint3;
+
     struct Variables {
         uint256 balanceCoinUserBefore;
         uint256 balanceCoinNotaryBefore;
@@ -108,22 +109,13 @@ contract VaultTest is Test {
         mockToken3.approve(address(vault), INITIAL_DEPOSIT * 10 ** decimals[2]);
 
         vault.addOneCollateral(
-            address(mockToken1),
-            INITIAL_DEPOSIT * 10 ** decimals[0],
-            decimals[0],
-            priceFeeds[0]
+            address(mockToken1), INITIAL_DEPOSIT * 10 ** decimals[0], decimals[0], address(priceFeeds[0]), "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken2),
-            INITIAL_DEPOSIT * 10 ** decimals[1],
-            decimals[1],
-            priceFeeds[1]
+            address(mockToken2), INITIAL_DEPOSIT * 10 ** decimals[1], decimals[1], address(priceFeeds[1]), "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken3),
-            INITIAL_DEPOSIT * 10 ** decimals[2],
-            decimals[2],
-            priceFeeds[2]
+            address(mockToken3), INITIAL_DEPOSIT * 10 ** decimals[2], decimals[2], address(priceFeeds[2]), "ETH"
         );
     }
 
@@ -131,20 +123,19 @@ contract VaultTest is Test {
         uint256 stablecoinAmount = 100 * 1e18;
         uint256 ratio = 150;
         uint256 expectedCollateralTotal = ((stablecoinAmount * ratio) / 100);
-        uint256 collateralTotal = vault
-            .calculateCollateralTotalAmountInDecimals(stablecoinAmount);
+        uint256 collateralTotal = vault.calculateCollateralTotalAmountInDecimals(stablecoinAmount);
         assertEq(collateralTotal, expectedCollateralTotal);
     }
 
     function testCanTake() public {
         uint256 moreDebt = 100 * 1e18;
-        bool canTakeDebt = vault.canTake(moreDebt);
+        bool canTakeDebt = vault.canTake(address(1), moreDebt);
         assertTrue(canTakeDebt);
     }
 
     function testCanNotTake() public {
         uint256 moreDebt = 15000 * 1e18;
-        bool canTakeDebt = vault.canTake(moreDebt);
+        bool canTakeDebt = vault.canTake(address(1), moreDebt);
         assertFalse(canTakeDebt);
     }
 
@@ -152,7 +143,7 @@ contract VaultTest is Test {
         uint256 moreDebt = 150 * 1e18;
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
-        vault.take(receiver, moreDebt);
+        vault.take(moreDebt);
         uint256 debt = vault.getDebt(receiver);
         uint256 balance = coin.balanceOf(receiver);
         assertEq(debt, moreDebt);
@@ -163,7 +154,7 @@ contract VaultTest is Test {
         uint256 moreDebt = 150 * 1e18;
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
-        vault.take(receiver, moreDebt);
+        vault.take(moreDebt);
         uint256 balanceBefore = coin.balanceOf(receiver);
         vault.payDebt((moreDebt * 50) / 100);
         uint256 debt = vault.getDebt(receiver);
@@ -193,7 +184,7 @@ contract VaultTest is Test {
         uint256 moreDebt = 150 * 1e18;
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
-        vault.take(receiver, moreDebt);
+        vault.take(moreDebt);
         uint256 tokAmountVBefore = vault.getAmounts(mockToken1, receiver);
         uint256 tokAmountUBefore = mockToken1.balanceOf(receiver);
 
@@ -209,7 +200,7 @@ contract VaultTest is Test {
         uint256 moreDebt = 100 * 1e18;
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
-        vault.take(receiver, moreDebt);
+        vault.take(moreDebt);
         Variables memory T;
 
         T.balanceCoinUserBefore = coin.balanceOf(receiver);
@@ -244,11 +235,9 @@ contract VaultTest is Test {
         T.balanceCoin1VaultAfter = tokens[0].balanceOf(address(vault));
         T.balanceCoin2VaultAfter = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultAfter = tokens[2].balanceOf(address(vault));
-        uint256 penalty = ((vault.getPenalty() * moreDebt) +
-            ((vault.getRate() * moreDebt) / 86400)) / 3;
-        uint256 collateralkept = (penalty *
-            10 ** vault.getDecimals(mockToken3, receiver)) /
-            (100 * 10 ** vault.getStablecoinDecimals());
+        uint256 penalty = ((vault.getPenalty() * moreDebt) + ((vault.getRate() * moreDebt) / 86400)) / 3;
+        uint256 collateralkept =
+            (penalty * 10 ** vault.getDecimals(mockToken3, receiver)) / (100 * 10 ** vault.getStablecoinDecimals());
         console.log(collateralkept);
 
         assertEq(T.balanceCoinUserBefore, moreDebt);
@@ -272,10 +261,7 @@ contract VaultTest is Test {
 
         assertEq(T.balanceCoin1UserAfter, amountToMint1);
         assertEq(T.balanceCoin2UserAfter, amountToMint2);
-        assertEq(
-            T.balanceCoin3UserAfter / 100,
-            (amountToMint3 - collateralkept) / 100
-        );
+        assertEq(T.balanceCoin3UserAfter / 100, (amountToMint3 - collateralkept) / 100);
         console.log("Assertion");
         assertEq(T.balanceCoin1NotaryAfter, 0);
         assertEq(T.balanceCoin2NotaryAfter, 0);
