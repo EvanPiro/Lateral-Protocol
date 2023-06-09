@@ -5,6 +5,7 @@ import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "lib/chainlink/contracts/src/v0.8/interfaces/automation/KeeperCompatibleInterface.sol";
 import "./Vault.sol";
+import "lib/chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol";
 
 /**
  * @dev Notary contract registers and authenticates Positions.
@@ -23,6 +24,7 @@ contract Notary is Ownable {
     uint256 public immutable RATIO;
     address public coinAddress;
     address public portfolioAddress;
+    address public weightProviderAddress;
     uint256 s_lastTimeStamp;
     uint256 i_interval;
 
@@ -45,11 +47,13 @@ contract Notary is Ownable {
      */
     function activate(
         address _coinAddress,
-        address _portfolio
+        address _portfolio,
+        address _weightProviderAddress
     ) public onlyOwner {
         // @Todo check for notary address, investigate recursive implications.
         coinAddress = _coinAddress;
         portfolioAddress = _portfolio;
+        weightProviderAddress = _weightProviderAddress;
         activated = true;
     }
 
@@ -99,22 +103,13 @@ contract Notary is Ownable {
     //     //call execute requests
     // }
 
-    // function fullfillrequest(uint256 result) public {
-    //     uint256 weight = result;
-    //     uint256[2] memory _targetWeights;
-    //     _targetWeights[0] = weight;
-    //     _targetWeights[1] = 1 - weight;
-
-    //     // updateAssetsAndPortfolioTestnet(_targetWeights);
-    // }
-
-    // // perform upkeep -> execute request
-    // // fulfill request -> updateAssetsAndPortfolio
-    // // fulfill request will pass the ratio to updateAssetsAndPortfolio
-    // // function performUpKeep()
-    // // chainlink functions
-    // // Portfolio rebalancing if strategy is dynamic
-    // // liquidations
+    // perform upkeep -> execute request
+    // fulfill request -> updateAssetsAndPortfolio
+    // fulfill request will pass the ratio to updateAssetsAndPortfolio
+    // function performUpKeep()
+    // chainlink functions
+    // Portfolio rebalancing if strategy is dynamic
+    // liquidations
 
     // function updateAssetsAndPortfolioTestnet(
     //     // address[] memory _assetsAddress,

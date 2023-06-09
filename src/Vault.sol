@@ -462,7 +462,7 @@ contract Vault is Ownable {
     ) public view returns (uint256) {
         return
             (s_collateral[_user].getBasketBalance(s_priceFeedBenchmark) *
-                ERC_DECIMAL) / 10 ** i_stablecoin_decimals;
+                ERC_DECIMAL) / (10 ** i_stablecoin_decimals);
     }
 
     /**

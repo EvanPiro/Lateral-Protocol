@@ -5,8 +5,12 @@
     "axios": "^1.4.0",
     "compute-covariance": "^1.0.1",
     "mathjs": "^11.8.0",
+    "minify": "^10.2.0",
     "numeric": "^1.2.6",
     "prettier": "^2.8.8",
     "typescript": "^4.9.5"
+  },
+  "scripts": {
+    "mini": "npx minify functions-request.js"
   }
 }

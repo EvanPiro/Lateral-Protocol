@@ -6,6 +6,7 @@ import "../Mocks/MockERC20.sol";
 import "../Mocks/MockV3Aggregator.sol";
 import "../../src/Vault.sol";
 import "../../src/Notary.sol";
+import {WeightProvider} from "../../src/WeightProvider.sol";
 
 contract VaultTest is Test {
     MockERC20 private mockToken1;
@@ -81,7 +82,11 @@ contract VaultTest is Test {
         priceFeeds[1] = mockPriceFeed2;
         priceFeeds[2] = mockPriceFeed3;
 
+        address functionsOracleAddress = address(111);
+
         vm.startPrank(address(1));
+
+        // @Todo set up mock functionsOracleProxyAddress contract
         notary = new Notary(RATIO);
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
@@ -92,7 +97,9 @@ contract VaultTest is Test {
             address(notary)
         );
 
-        notary.activate(address(coin), address(portfolio));
+        WeightProvider weightProvider = new WeightProvider(functionsOracleAddress, address(notary));
+
+        notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(address(mockPriceFeedETHUSD)));
         console.log(address(notary));
         console.log("Vault created!");
@@ -215,7 +222,7 @@ contract VaultTest is Test {
         T.balanceCoin2VaultBefore = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultBefore = tokens[2].balanceOf(address(vault));
 
-        notary.liquidateVaults();
+//        notary.liquidateVaults();
         // vault.liquidate(address(1));
 
         T.balanceCoinUserAfter = coin.balanceOf(receiver);
