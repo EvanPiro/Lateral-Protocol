@@ -52,10 +52,7 @@ contract Portfolio is Ownable {
         _;
     }
 
-    constructor(
-        address _uniswapV2Router,
-        address _notaryAddress
-    ) {
+    constructor(address _uniswapV2Router, address _notaryAddress) {
         // i_router = ISwapRouter(_uniswapV3Router);
         i_routerV2 = IUniswapV2Router02(_uniswapV2Router);
         i_notary = _notaryAddress;
@@ -74,6 +71,10 @@ contract Portfolio is Ownable {
         s_targetWeights = _targetWeights;
         s_priceFeeds = _priceFeeds;
         s_decimals = _decimals;
+    }
+
+    function updateWeights(uint256[] memory _targetWeights) public onlyNotary {
+        s_targetWeights = _targetWeights;
     }
 
     function swapSingleHopExactAmountInV2(
