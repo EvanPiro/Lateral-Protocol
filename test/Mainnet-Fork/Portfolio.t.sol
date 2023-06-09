@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "../../src/Vault.sol";
+import "../../src/WeightProvider.sol";
 // import "../src/UniswapV3Examples.sol";
 
 address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -70,12 +71,16 @@ contract UniV3Test is Test {
 
     function setUp() public {
         vm.startPrank(address(1));
+        // @Todo deploy mock oracle
+        address functionsOracleAddress = address(111);
 
         // @Todo set up mock functionsOracleProxyAddress contract
-        notary = new Notary(RATIO, address(11));
+        notary = new Notary(RATIO);
         Coin coin = new Coin(address(notary));
         Portfolio portfolio = new Portfolio(ROUTERV02, address(notary));
-        notary.activate(address(coin), address(portfolio));
+        WeightProvider weightProvider = new WeightProvider(functionsOracleAddress, address(notary));
+
+        notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(ETHUSD));
 
         console.log("Vault created!");

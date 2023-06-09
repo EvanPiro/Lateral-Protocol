@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.17;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
@@ -453,7 +453,7 @@ contract Vault is Ownable {
     ) public view returns (uint256) {
         return
             (s_collateral[_user].getBasketBalance(s_priceFeedBenchmark) *
-                ERC_DECIMAL) / 10 ** i_stablecoin_decimals;
+                ERC_DECIMAL) / (10 ** i_stablecoin_decimals);
     }
 
     /**

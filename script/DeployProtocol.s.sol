@@ -6,6 +6,7 @@ import "../src/Notary.sol";
 import "../src/Portfolio.sol";
 import "../src/Coin.sol";
 import "../src/Vault.sol";
+import { WeightProvider } from "../src/WeightProvider.sol";
 
 // Sepolia
 contract DeployProtocol is Script {
@@ -23,7 +24,7 @@ contract DeployProtocol is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        Notary notary = new Notary(minRatio, functionsOracleProxyAddress);
+        Notary notary = new Notary(minRatio);
         address notaryAddress = address(notary);
 
         Coin coin = new Coin(address(notary));
@@ -32,7 +33,11 @@ contract DeployProtocol is Script {
         Portfolio portfolio = new Portfolio(uniswapV2Router, notaryAddress);
         address portfolioAddress = address(portfolio);
 
-        notary.activate(coinAddress, portfolioAddress);
+        WeightProvider weightProvider = new WeightProvider(functionsOracleProxyAddress, address(notary));
+
+        address weightProviderAddress = address(weightProvider);
+
+        notary.activate(coinAddress, portfolioAddress, weightProviderAddress);
         Vault vault = Vault(notary.openVault(priceFeedBenchmark));
 
         vm.stopBroadcast();
