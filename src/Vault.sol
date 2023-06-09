@@ -57,16 +57,6 @@ contract Vault is Ownable {
         _;
     }
 
-    // modifier onlyUser() {
-    //     require(msg.sender == s_user, "Only the user can call this function");
-    //     _;
-    // }
-
-    // modifier onlyNotaryOrUser() {
-    //     require(msg.sender == s_user || msg.sender == s_notary);
-    //     _;
-    // }
-
     constructor(
         address _coinAddress,
         address _notary,
@@ -76,7 +66,7 @@ contract Vault is Ownable {
         i_coin = Coin(_coinAddress);
         // s_user = _user;
         s_debt[msg.sender] = 0;
-        s_lastTimeStamp[msg.sender] = block.timestamp;
+        // s_lastTimeStamp[msg.sender] = block.timestamp;
         s_isInsolvent[msg.sender] = false;
         s_notary = _notary;
         i_stablecoin_decimals = i_coin.decimals();
@@ -178,6 +168,7 @@ contract Vault is Ownable {
 
         i_coin.mint(address(this), msg.sender, _moreDebt);
         s_debt[msg.sender] += _moreDebt;
+        s_lastTimeStamp[msg.sender] = block.timestamp;
         emit CoinMinted(msg.sender, _moreDebt);
     }
 
@@ -354,6 +345,7 @@ contract Vault is Ownable {
         i_coin.burn(address(this), _amount);
         uint256 accruedInterest = getAccruedInterest(msg.sender);
         s_debt[msg.sender] -= _amount + accruedInterest;
+        s_lastTimeStamp[msg.sender] = block.timestamp;
     }
 
     function updateStrategy(uint256 _strategy) public {

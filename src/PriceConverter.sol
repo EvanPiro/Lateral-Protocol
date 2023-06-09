@@ -7,25 +7,23 @@ import "./BasketHandler.sol";
 import "forge-std/Test.sol";
 
 library PriceConverter {
-    function getPrice(
-        AggregatorV3Interface priceFeed
-    ) internal view returns (uint256) {
-        (, int256 answer, , , ) = priceFeed.latestRoundData();
+    function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {
+        (, int256 answer,,,) = priceFeed.latestRoundData();
         uint8 decimals = priceFeed.decimals();
         return uint256(answer * int256(1e18 / 10 ** decimals));
     }
 
-    function getPriceOfBasket(
-        Basket storage basketOfTokens
-    ) internal view returns (IERC20[] memory tokens, uint256[] memory prices) {
+    function getPriceOfBasket(Basket storage basketOfTokens)
+        internal
+        view
+        returns (IERC20[] memory tokens, uint256[] memory prices)
+    {
         uint256 length = basketOfTokens.erc20s.length;
         tokens = new IERC20[](length);
         prices = new uint256[](length);
         for (uint256 i = 0; i < length; ++i) {
             tokens[i] = basketOfTokens.erc20s[i];
-            prices[i] = getPrice(
-                basketOfTokens.priceFeedBasket[basketOfTokens.erc20s[i]]
-            );
+            prices[i] = getPrice(basketOfTokens.priceFeedBasket[basketOfTokens.erc20s[i]]);
 
             // ETH/USD rate in 18 digit
             // answer is in decimal digits
@@ -44,15 +42,10 @@ library PriceConverter {
     ) internal view returns (uint256) {
         uint256 tokenPrice = getPrice(priceFeed);
         uint256 tokenAmountInUsd;
-        if (
-            keccak256(abi.encodePacked(baseCurrency)) ==
-            keccak256(abi.encodePacked("USD"))
-        ) {
+        if (keccak256(abi.encodePacked(baseCurrency)) == keccak256(abi.encodePacked("USD"))) {
             tokenAmountInUsd = (tokenPrice * tokenAmount) / (10 ** decimals);
         } else {
-            tokenAmountInUsd =
-                (tokenPrice * tokenAmount * 1e18) /
-                (10 ** decimals * getPrice(priceFeedEth));
+            tokenAmountInUsd = (tokenPrice * tokenAmount * 1e18) / (10 ** decimals * getPrice(priceFeedEth));
         }
         return tokenAmountInUsd;
     }
@@ -64,9 +57,7 @@ library PriceConverter {
         string memory baseCurrency
     ) internal view returns (uint256 price) {
         uint256 length = self.erc20s.length;
-        (IERC20[] memory tokens, uint256[] memory prices) = getPriceOfBasket(
-            self
-        );
+        (IERC20[] memory tokens, uint256[] memory prices) = getPriceOfBasket(self);
         for (uint256 i = 0; i < length; ++i) {
             price += getConversionRate(
                 self.tokenAmts[tokens[i]],

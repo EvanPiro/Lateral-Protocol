@@ -222,7 +222,7 @@ contract VaultTest is Test {
         T.balanceCoin2VaultBefore = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultBefore = tokens[2].balanceOf(address(vault));
 
-//        notary.liquidateVaults();
+        //        notary.liquidateVaults();
         // vault.liquidate(address(1));
 
         T.balanceCoinUserAfter = coin.balanceOf(receiver);

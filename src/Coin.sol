@@ -34,11 +34,7 @@ contract Coin is ERC20 {
      * @dev Mints for authenticated position contracts.
      */
 
-    function mint(
-        address _positionAddress,
-        address _receiver,
-        uint256 _moreDebt
-    ) external onlyAuthorized {
+    function mint(address _positionAddress, address _receiver, uint256 _moreDebt) external onlyAuthorized {
         // require(
         //     notary.isValidPosition(_positionAddress),
         //     "Caller is not authorized to mint"
@@ -46,10 +42,7 @@ contract Coin is ERC20 {
         _mint(_receiver, _moreDebt);
     }
 
-    function burn(
-        address owner,
-        uint256 _stablecoinAmount
-    ) external onlyAuthorized {
+    function burn(address owner, uint256 _stablecoinAmount) external onlyAuthorized {
         require(_stablecoinAmount > 0, "Invalid stablecoin amount");
 
         _burn(owner, _stablecoinAmount);

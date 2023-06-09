@@ -6,7 +6,7 @@ import "../src/Notary.sol";
 import "../src/Portfolio.sol";
 import "../src/Coin.sol";
 import "../src/Vault.sol";
-import { WeightProvider } from "../src/WeightProvider.sol";
+import {WeightProvider} from "../src/WeightProvider.sol";
 
 // Sepolia
 contract DeployProtocol is Script {
