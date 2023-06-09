@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.17;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./BasketHandler.sol";
 import "./PriceConverter.sol";
@@ -51,7 +50,10 @@ contract Vault is Ownable {
     event RebalanceEvent(Portfolio.STRATEGY strategy);
 
     modifier onlyNotary() {
-        require(msg.sender == s_notary, "Only the notary can call this function");
+        require(
+            msg.sender == s_notary,
+            "Only the notary can call this function"
+        );
         _;
     }
 
@@ -65,7 +67,12 @@ contract Vault is Ownable {
     //     _;
     // }
 
-    constructor(address _coinAddress, address _notary, address _portfolio, address _priceFeedBenchmark) {
+    constructor(
+        address _coinAddress,
+        address _notary,
+        address _portfolio,
+        address _priceFeedBenchmark
+    ) {
         i_coin = Coin(_coinAddress);
         // s_user = _user;
         s_debt[msg.sender] = 0;
@@ -119,7 +126,11 @@ contract Vault is Ownable {
     ) public {
         uint256 length = _tokenAddress.length;
         for (uint256 i = 0; i < length; ++i) {
-            IERC20(_tokenAddress[i]).transferFrom(msg.sender, address(this), _tokenAmts[i]);
+            IERC20(_tokenAddress[i]).transferFrom(
+                msg.sender,
+                address(this),
+                _tokenAmts[i]
+            );
             s_collateral[msg.sender].add(
                 IERC20(_tokenAddress[i]),
                 _tokenAmts[i],
@@ -152,48 +163,84 @@ contract Vault is Ownable {
      *  An approve function needs to be added in case of liquidation
      */
     function take(uint256 _moreDebt) public {
-        require(canTake(msg.sender, _moreDebt), "Position cannot take more debt");
-        require(s_isInsolvent[msg.sender] == false, "Debtor needs to pay debt first");
-        require(IERC20(i_coin).allowance(msg.sender, address(this)) >= _moreDebt, "Insufficient allowance");
+        require(
+            canTake(msg.sender, _moreDebt),
+            "Position cannot take more debt"
+        );
+        require(
+            s_isInsolvent[msg.sender] == false,
+            "Debtor needs to pay debt first"
+        );
+        require(
+            IERC20(i_coin).allowance(msg.sender, address(this)) >= _moreDebt,
+            "Insufficient allowance"
+        );
 
         i_coin.mint(address(this), msg.sender, _moreDebt);
         s_debt[msg.sender] += _moreDebt;
         emit CoinMinted(msg.sender, _moreDebt);
     }
 
-    function getTokenAmountsToSend(address _user, uint256 positiveRemainingCollateralInDecimals)
-        public
-        onlyNotary
-        returns (uint256[] memory)
-    {
+    function getTokenAmountsToSend(
+        address _user,
+        uint256 positiveRemainingCollateralInDecimals
+    ) public onlyNotary returns (uint256[] memory) {
         uint256[] memory tokenAmountstoSend = new uint256[](
             s_collateral[_user].erc20s.length
         );
         for (uint256 i = 0; i < s_collateral[_user].erc20s.length; i++) {
-            uint256 tokenBalance = s_collateral[_user].tokenAmts[s_collateral[_user].erc20s[i]];
+            uint256 tokenBalance = s_collateral[_user].tokenAmts[
+                s_collateral[_user].erc20s[i]
+            ];
             uint256 tokenValueInUSD = PriceConverter.getConversionRate(
                 tokenBalance,
-                s_collateral[_user].priceFeedBasket[s_collateral[_user].erc20s[i]],
+                s_collateral[_user].priceFeedBasket[
+                    s_collateral[_user].erc20s[i]
+                ],
                 s_collateral[_user].decimals[s_collateral[_user].erc20s[i]],
                 s_priceFeedBenchmark,
                 s_collateral[_user].baseCurrency[s_collateral[_user].erc20s[i]]
             );
 
             if (positiveRemainingCollateralInDecimals <= tokenValueInUSD) {
-                tokenAmountstoSend[i] = (
-                    positiveRemainingCollateralInDecimals
-                        * 10 ** s_collateral[_user].decimals[s_collateral[_user].erc20s[i]]
-                ) / PriceConverter.getPrice(s_collateral[_user].priceFeedBasket[s_collateral[_user].erc20s[i]]);
-                s_collateral[_user].erc20s[i].transfer(_user, tokenAmountstoSend[i]);
-                s_collateral[_user].tokenAmts[s_collateral[_user].erc20s[i]] -= tokenAmountstoSend[i];
+                tokenAmountstoSend[i] =
+                    (positiveRemainingCollateralInDecimals *
+                        10 **
+                            s_collateral[_user].decimals[
+                                s_collateral[_user].erc20s[i]
+                            ]) /
+                    PriceConverter.getPrice(
+                        s_collateral[_user].priceFeedBasket[
+                            s_collateral[_user].erc20s[i]
+                        ]
+                    );
+                s_collateral[_user].erc20s[i].transfer(
+                    _user,
+                    tokenAmountstoSend[i]
+                );
+                s_collateral[_user].tokenAmts[
+                    s_collateral[_user].erc20s[i]
+                ] -= tokenAmountstoSend[i];
                 break;
             } else {
-                tokenAmountstoSend[i] = (
-                    tokenValueInUSD
-                        / PriceConverter.getPrice(s_collateral[_user].priceFeedBasket[s_collateral[_user].erc20s[i]])
-                ) * 10 ** s_collateral[_user].decimals[s_collateral[_user].erc20s[i]];
-                s_collateral[_user].erc20s[i].transfer(_user, tokenAmountstoSend[i]);
-                s_collateral[_user].tokenAmts[s_collateral[_user].erc20s[i]] -= tokenAmountstoSend[i];
+                tokenAmountstoSend[i] =
+                    (tokenValueInUSD /
+                        PriceConverter.getPrice(
+                            s_collateral[_user].priceFeedBasket[
+                                s_collateral[_user].erc20s[i]
+                            ]
+                        )) *
+                    10 **
+                        s_collateral[_user].decimals[
+                            s_collateral[_user].erc20s[i]
+                        ];
+                s_collateral[_user].erc20s[i].transfer(
+                    _user,
+                    tokenAmountstoSend[i]
+                );
+                s_collateral[_user].tokenAmts[
+                    s_collateral[_user].erc20s[i]
+                ] -= tokenAmountstoSend[i];
                 positiveRemainingCollateralInDecimals -= tokenValueInUSD;
             }
         }
@@ -237,8 +284,12 @@ contract Vault is Ownable {
         // 2. Return Remaining Collateral to the debtor (after deducting fee)
         // If available stables < debt, reduce the collateral by the missing amount
         // Since this is basket like col, reduce each balance until 0 then repeat
-        int256 remainingCollateralInDecimals =
-            int256(totalCollateralInDecimals) - int256(accruedInterest) - int256(penalty) - int256(s_debt[_user]);
+        int256 remainingCollateralInDecimals = int256(
+            totalCollateralInDecimals
+        ) -
+            int256(accruedInterest) -
+            int256(penalty) -
+            int256(s_debt[_user]);
         console.log(accruedInterest);
         console.log(penalty);
         console.log(s_debt[_user]);
@@ -247,12 +298,17 @@ contract Vault is Ownable {
             s_debt[_user] += uint256(-remainingCollateralInDecimals);
             remainingCollateralInDecimals = 0;
         } else {
-            uint256 positiveRemainingCollateralInDecimals = uint256(remainingCollateralInDecimals);
+            uint256 positiveRemainingCollateralInDecimals = uint256(
+                remainingCollateralInDecimals
+            );
             // Convert the remainingCollateral to token amounts
             uint256[] memory tokenAmountstoSend = new uint256[](
                 s_collateral[_user].erc20s.length
             );
-            tokenAmountstoSend = getTokenAmountsToSend(_user, positiveRemainingCollateralInDecimals);
+            tokenAmountstoSend = getTokenAmountsToSend(
+                _user,
+                positiveRemainingCollateralInDecimals
+            );
         }
         console.log("--");
 
@@ -296,18 +352,24 @@ contract Vault is Ownable {
 
         i_coin.transferFrom(msg.sender, address(this), _amount);
         i_coin.burn(address(this), _amount);
-        s_debt[msg.sender] -= _amount;
+        uint256 accruedInterest = getAccruedInterest(msg.sender);
+        s_debt[msg.sender] -= _amount + accruedInterest;
     }
 
     function updateStrategy(uint256 _strategy) public {
         s_strategy[msg.sender] = Portfolio.STRATEGY(_strategy);
     }
 
-    function updateCollateralPortfolio(address weth, uint24 _poolFee, address _user) public onlyNotary {
+    function updateCollateralPortfolio(
+        address weth,
+        uint24 _poolFee,
+        address _user
+    ) public onlyNotary {
         uint256 length = s_collateral[_user].erc20s.length;
         for (uint256 i = 0; i < length; i++) {
             s_collateral[_user].erc20s[i].approve(
-                address(s_portfolio), s_collateral[_user].tokenAmts[s_collateral[_user].erc20s[i]]
+                address(s_portfolio),
+                s_collateral[_user].tokenAmts[s_collateral[_user].erc20s[i]]
             );
         }
         IERC20(weth).approve(address(s_portfolio), MAX_ALLOWANCE);
@@ -324,35 +386,59 @@ contract Vault is Ownable {
         emit RebalanceEvent(getStrategy(_user));
     }
 
-    function retrieveCollateral(address _tokAddress, uint256 _tokAmount) public {
-        require(s_collateral[msg.sender].erc20s.length > 0, "There is no collateral");
+    function retrieveCollateral(
+        address _tokAddress,
+        uint256 _tokAmount
+    ) public {
+        require(
+            s_collateral[msg.sender].erc20s.length > 0,
+            "There is no collateral"
+        );
         uint256 nRatio;
         if (s_debt[msg.sender] == 0) {
             nRatio = 200;
         } else {
-            nRatio = getCurrentRatio(msg.sender)
-                - getCurrentRatio(
+            nRatio =
+                getCurrentRatio(msg.sender) -
+                getCurrentRatio(
                     PriceConverter.getConversionRate(
                         _tokAmount,
-                        s_collateral[msg.sender].priceFeedBasket[IERC20(_tokAddress)],
+                        s_collateral[msg.sender].priceFeedBasket[
+                            IERC20(_tokAddress)
+                        ],
                         s_collateral[msg.sender].decimals[IERC20(_tokAddress)],
                         s_priceFeedBenchmark,
-                        s_collateral[msg.sender].baseCurrency[IERC20(_tokAddress)]
+                        s_collateral[msg.sender].baseCurrency[
+                            IERC20(_tokAddress)
+                        ]
                     ),
                     msg.sender
                 );
         }
-        require(nRatio > RATIO, "After retrieving the collateral, the position will be undercollateralized");
-        require(s_isInsolvent[msg.sender] == false, "User needs to pay debt first");
+        require(
+            nRatio > RATIO,
+            "After retrieving the collateral, the position will be undercollateralized"
+        );
+        require(
+            s_isInsolvent[msg.sender] == false,
+            "User needs to pay debt first"
+        );
 
         IERC20(_tokAddress).transfer(msg.sender, _tokAmount);
-        s_collateral[msg.sender].reduce(IERC20(_tokAddress), _tokAmount, s_priceFeedBenchmark);
+        s_collateral[msg.sender].reduce(
+            IERC20(_tokAddress),
+            _tokAmount,
+            s_priceFeedBenchmark
+        );
         emit CollateralRetrieved();
     }
 
     function RetrieveAll() public {
         require(s_debt[msg.sender] > 0, "No debt");
-        require(s_debt[msg.sender] <= i_coin.balanceOf(msg.sender), "Balance is lower than debt");
+        require(
+            s_debt[msg.sender] <= i_coin.balanceOf(msg.sender),
+            "Balance is lower than debt"
+        );
         payDebt(s_debt[msg.sender]);
         s_collateral[msg.sender].Transfer(msg.sender);
         emit CollateralRetrieved();
@@ -363,37 +449,58 @@ contract Vault is Ownable {
      * @dev calculate the total collateral amount in USD needed to hedge against
      *      the total exposure
      */
-    function calculateCollateralTotalAmountInDecimals(uint256 _stablecoinAmount) public view returns (uint256) {
-        return (((_stablecoinAmount * ERC_DECIMAL) / 10 ** i_stablecoin_decimals) * RATIO) / 100;
+    function calculateCollateralTotalAmountInDecimals(
+        uint256 _stablecoinAmount
+    ) public view returns (uint256) {
+        return
+            (((_stablecoinAmount * ERC_DECIMAL) / 10 ** i_stablecoin_decimals) *
+                RATIO) / 100;
     }
 
-    function TotalBalanceInDecimals(address _user) public view returns (uint256) {
-        return (s_collateral[_user].getBasketBalance(s_priceFeedBenchmark) * ERC_DECIMAL) / 10 ** i_stablecoin_decimals;
+    function TotalBalanceInDecimals(
+        address _user
+    ) public view returns (uint256) {
+        return
+            (s_collateral[_user].getBasketBalance(s_priceFeedBenchmark) *
+                ERC_DECIMAL) / 10 ** i_stablecoin_decimals;
     }
 
     /**
      * @dev Returns true if the contract's debt position can increase by a specified amount.
      */
-    function canTake(address _user, uint256 _moreDebt) public view returns (bool) {
+    function canTake(
+        address _user,
+        uint256 _moreDebt
+    ) public view returns (bool) {
         require(_moreDebt > 0, "Cannot take 0");
-        require(s_isInsolvent[_user] == false, "Debtor needs to pay debt first");
+        require(
+            s_isInsolvent[_user] == false,
+            "Debtor needs to pay debt first"
+        );
 
         uint256 totalCollateralInDecimals = TotalBalanceInDecimals(_user);
 
         uint256 debtInCoins = s_debt[_user] + _moreDebt;
         return
-            ((totalCollateralInDecimals * 100) / ((debtInCoins * ERC_DECIMAL) / 10 ** i_stablecoin_decimals)) >= RATIO;
+            ((totalCollateralInDecimals * 100) /
+                ((debtInCoins * ERC_DECIMAL) / 10 ** i_stablecoin_decimals)) >=
+            RATIO;
     }
 
     function getAccruedInterest(address _user) public view returns (uint256) {
-        return (
-            (((s_debt[_user] * RATE * (block.timestamp - s_lastTimeStamp[_user])) / 86400) * ERC_DECIMAL)
-                / 10 ** i_stablecoin_decimals
-        ) / 100;
+        return
+            ((((s_debt[_user] *
+                RATE *
+                (block.timestamp - s_lastTimeStamp[_user])) / 86400) *
+                ERC_DECIMAL) / 10 ** i_stablecoin_decimals) / 100;
     }
 
-    function getLiquidationPenalty(address _user) public view returns (uint256) {
-        return ((PENALTY * s_debt[_user] * ERC_DECIMAL) / 10 ** i_stablecoin_decimals) / 100;
+    function getLiquidationPenalty(
+        address _user
+    ) public view returns (uint256) {
+        return
+            ((PENALTY * s_debt[_user] * ERC_DECIMAL) /
+                10 ** i_stablecoin_decimals) / 100;
     }
 
     function getCurrentRatio(address _user) public view returns (uint256) {
@@ -402,12 +509,17 @@ contract Vault is Ownable {
         if (s_debt[_user] == 0) {
             cRatio = 200;
         } else {
-            cRatio = ((totalCollateralInDecimals * 100) / ERC_DECIMAL) / (s_debt[_user] / 10 ** i_stablecoin_decimals);
+            cRatio =
+                ((totalCollateralInDecimals * 100) / ERC_DECIMAL) /
+                (s_debt[_user] / 10 ** i_stablecoin_decimals);
         }
         return cRatio;
     }
 
-    function getCurrentRatio(uint256 amount, address _user) public view returns (uint256) {
+    function getCurrentRatio(
+        uint256 amount,
+        address _user
+    ) public view returns (uint256) {
         uint256 cRatio;
         if (s_debt[_user] == 0) {
             cRatio = 200;
@@ -417,7 +529,10 @@ contract Vault is Ownable {
         return cRatio;
     }
 
-    function getWeights(IERC20 token, address _user) public view returns (uint256) {
+    function getWeights(
+        IERC20 token,
+        address _user
+    ) public view returns (uint256) {
         return s_collateral[_user].weightsInPercent[token];
     }
 
@@ -425,19 +540,30 @@ contract Vault is Ownable {
         return s_collateral[_user].erc20s;
     }
 
-    function getAmounts(IERC20 token, address _user) public view returns (uint256) {
+    function getAmounts(
+        IERC20 token,
+        address _user
+    ) public view returns (uint256) {
         return s_collateral[_user].tokenAmts[token];
     }
 
-    function getDecimals(IERC20 token, address _user) public view returns (uint8) {
+    function getDecimals(
+        IERC20 token,
+        address _user
+    ) public view returns (uint8) {
         return s_collateral[_user].decimals[token];
     }
 
-    function getPriceFeeds(IERC20 token, address _user) public view returns (AggregatorV3Interface) {
+    function getPriceFeeds(
+        IERC20 token,
+        address _user
+    ) public view returns (AggregatorV3Interface) {
         return s_collateral[_user].priceFeedBasket[token];
     }
 
-    function getBenchmarkFeed(address _user) public view returns (AggregatorV3Interface) {
+    function getBenchmarkFeed(
+        address _user
+    ) public view returns (AggregatorV3Interface) {
         return s_priceFeedBenchmark;
     }
 
@@ -481,7 +607,9 @@ contract Vault is Ownable {
         return ERC_DECIMAL;
     }
 
-    function getStrategy(address _user) public view returns (Portfolio.STRATEGY) {
+    function getStrategy(
+        address _user
+    ) public view returns (Portfolio.STRATEGY) {
         return s_strategy[_user];
     }
 }

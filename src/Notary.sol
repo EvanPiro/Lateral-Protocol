@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.17;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
@@ -12,7 +12,7 @@ import "./Vault.sol";
  * This contract allows users to open positions, which can be verified
  * during the minting of the stablecoin.
  */
-contract Notary is Ownable, KeeperCompatibleInterface {
+contract Notary is Ownable {
     mapping(address => bool) public isValidPosition;
     address public vaultAddress;
     // Vault[] public vaults;
@@ -43,7 +43,10 @@ contract Notary is Ownable, KeeperCompatibleInterface {
      * @dev Activates the notary by providing the address of a token contract
      * that has been configured to reference this address.
      */
-    function activate(address _coinAddress, address _portfolio) public onlyOwner {
+    function activate(
+        address _coinAddress,
+        address _portfolio
+    ) public onlyOwner {
         // @Todo check for notary address, investigate recursive implications.
         coinAddress = _coinAddress;
         portfolioAddress = _portfolio;
@@ -53,7 +56,9 @@ contract Notary is Ownable, KeeperCompatibleInterface {
     /**
      * @dev Opens a position for a specified vault owner address.
      */
-    function openVault(address s_priceFeedBenchmark) public isActivated returns (address) {
+    function openVault(
+        address s_priceFeedBenchmark
+    ) public isActivated returns (address) {
         Vault vault = new Vault(
             coinAddress,
             address(this),
@@ -70,64 +75,64 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         return vaultAddress;
     }
 
-    function checkUpkeep(bytes memory /*checkData*/ )
-        public
-        override
-        returns (bool upkeepNeeded, bytes memory /*performData*/ )
-    {
-        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
-        bool hasUsers = (Vault(vaultAddress).getUsers().length > 0);
-        upkeepNeeded = (timePassed && hasUsers);
-        //         upkeepNeeded boolean to indicate whether the keeper should call
-        //    * performUpkeep or not.
-    }
+    // function checkUpkeep(bytes memory /*checkData*/ )
+    //     public
+    //     override
+    //     returns (bool upkeepNeeded, bytes memory /*performData*/ )
+    // {
+    //     bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+    //     bool hasUsers = (Vault(vaultAddress).getUsers().length > 0);
+    //     upkeepNeeded = (timePassed && hasUsers);
+    //     //         upkeepNeeded boolean to indicate whether the keeper should call
+    //     //    * performUpkeep or not.
+    // }
 
-    function performUpkeep(bytes calldata /*performData*/ ) external override {
-        // Request the random number
-        // Once we get it, do something with it
-        // 2 transaction process
-        (bool upkeepNeeded,) = checkUpkeep("");
-        if (!upkeepNeeded) {}
+    // function performUpkeep(bytes calldata /*performData*/ ) external override {
+    //     // Request the random number
+    //     // Once we get it, do something with it
+    //     // 2 transaction process
+    //     (bool upkeepNeeded,) = checkUpkeep("");
+    //     if (!upkeepNeeded) {}
 
-        liquidateVaults();
+    //     liquidateVaults();
 
-        //call execute requests
-    }
+    //     //call execute requests
+    // }
 
-    function fullfillrequest(uint256 result) public {
-        uint256 weight = result;
-        uint256[2] memory _targetWeights;
-        _targetWeights[0] = weight;
-        _targetWeights[1] = 1 - weight;
+    // function fullfillrequest(uint256 result) public {
+    //     uint256 weight = result;
+    //     uint256[2] memory _targetWeights;
+    //     _targetWeights[0] = weight;
+    //     _targetWeights[1] = 1 - weight;
 
-        // updateAssetsAndPortfolioTestnet(_targetWeights);
-    }
+    //     // updateAssetsAndPortfolioTestnet(_targetWeights);
+    // }
 
-    // perform upkeep -> execute request
-    // fulfill request -> updateAssetsAndPortfolio
-    // fulfill request will pass the ratio to updateAssetsAndPortfolio
-    // function performUpKeep()
-    // chainlink functions
-    // Portfolio rebalancing if strategy is dynamic
-    // liquidations
+    // // perform upkeep -> execute request
+    // // fulfill request -> updateAssetsAndPortfolio
+    // // fulfill request will pass the ratio to updateAssetsAndPortfolio
+    // // function performUpKeep()
+    // // chainlink functions
+    // // Portfolio rebalancing if strategy is dynamic
+    // // liquidations
 
-    function updateAssetsAndPortfolioTestnet(
-        // address[] memory _assetsAddress,
-        uint256[] memory _targetWeights,
-        // uint8[] memory _decimals,
-        // AggregatorV3Interface[] memory _priceFeeds,
-        address weth,
-        uint24 _poolFee
-    ) public onlyOwner {
-        Portfolio(portfolioAddress).updateWeights(_targetWeights);
-        Vault vault = Vault(vaultAddress);
-        uint256 numUsers = vault.getUsers().length;
-        for (uint256 j = 0; j < numUsers; j++) {
-            if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
-                vault.updateCollateralPortfolio(weth, _poolFee, vault.getUsers()[j]);
-            }
-        }
-    }
+    // function updateAssetsAndPortfolioTestnet(
+    //     // address[] memory _assetsAddress,
+    //     uint256[] memory _targetWeights,
+    //     // uint8[] memory _decimals,
+    //     // AggregatorV3Interface[] memory _priceFeeds,
+    //     address weth,
+    //     uint24 _poolFee
+    // ) public onlyOwner {
+    //     Portfolio(portfolioAddress).updateWeights(_targetWeights);
+    //     Vault vault = Vault(vaultAddress);
+    //     uint256 numUsers = vault.getUsers().length;
+    //     for (uint256 j = 0; j < numUsers; j++) {
+    //         if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
+    //             vault.updateCollateralPortfolio(weth, _poolFee, vault.getUsers()[j]);
+    //         }
+    //     }
+    // }
 
     function updateAssetsAndPortfolio(
         address[] memory _assetsAddress,
@@ -139,13 +144,24 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         uint24 _poolFee
     ) public onlyOwner {
         Portfolio(portfolioAddress).updateAssets(
-            _assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies
+            _assetsAddress,
+            _targetWeights,
+            _decimals,
+            _priceFeeds,
+            _baseCurrencies
         );
         Vault vault = Vault(vaultAddress);
         uint256 numUsers = vault.getUsers().length;
         for (uint256 j = 0; j < numUsers; j++) {
-            if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
-                vault.updateCollateralPortfolio(weth, _poolFee, vault.getUsers()[j]);
+            if (
+                vault.getStrategy(vault.getUsers()[j]) ==
+                Portfolio.STRATEGY.DYNAMIC_MODEL
+            ) {
+                vault.updateCollateralPortfolio(
+                    weth,
+                    _poolFee,
+                    vault.getUsers()[j]
+                );
             }
         }
     }
