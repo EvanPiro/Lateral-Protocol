@@ -38,17 +38,27 @@ contract UniV3Test is Test {
     IERC20 private paxg = IERC20(PAXG);
     IERC20 private link = IERC20(LINK);
 
-    AggregatorV3Interface private priceFeedEthUsd = AggregatorV3Interface(ETHUSD);
-    AggregatorV3Interface private priceFeedDaiEth = AggregatorV3Interface(DAIETH);
-    AggregatorV3Interface private priceFeedBtcEth = AggregatorV3Interface(BTCETH);
-    AggregatorV3Interface private priceFeedUsdEth = AggregatorV3Interface(USDCETH);
-    AggregatorV3Interface private priceFeedPaxGeth = AggregatorV3Interface(PAXGETH);
-    AggregatorV3Interface private priceFeedLinkEth = AggregatorV3Interface(LINKETH);
+    AggregatorV3Interface private priceFeedEthUsd =
+        AggregatorV3Interface(ETHUSD);
+    AggregatorV3Interface private priceFeedDaiEth =
+        AggregatorV3Interface(DAIETH);
+    AggregatorV3Interface private priceFeedBtcEth =
+        AggregatorV3Interface(BTCETH);
+    AggregatorV3Interface private priceFeedUsdEth =
+        AggregatorV3Interface(USDCETH);
+    AggregatorV3Interface private priceFeedPaxGeth =
+        AggregatorV3Interface(PAXGETH);
+    AggregatorV3Interface private priceFeedLinkEth =
+        AggregatorV3Interface(LINKETH);
 
     address[] _assetsAddress = [PAXG, USDC, WBTC];
     uint256[] _targetWeights = [40, 40, 20];
     uint8[] _decimals = [PAXGdecimals, USDCdecimals, WBTCdecimals];
-    AggregatorV3Interface[] _priceFeeds = [priceFeedPaxGeth, priceFeedUsdEth, priceFeedBtcEth];
+    AggregatorV3Interface[] _priceFeeds = [
+        priceFeedPaxGeth,
+        priceFeedUsdEth,
+        priceFeedBtcEth
+    ];
 
     string[] _baseCurrencies = ["ETH", "ETH", "ETH"];
 
@@ -67,15 +77,20 @@ contract UniV3Test is Test {
         address functionsOracleAddress = address(111);
 
         // @Todo set up mock functionsOracleProxyAddress contract
-        notary = new Notary(RATIO);
+        notary = new Notary(WETH, 3000);
         Coin coin = new Coin(address(notary));
         Portfolio portfolio = new Portfolio(ROUTERV02, address(notary));
         WeightProvider weightProvider = new WeightProvider(
             functionsOracleAddress,
-            address(notary)
+            address(notary),
+            WETH
         );
 
-        notary.activate(address(coin), address(portfolio), address(weightProvider));
+        notary.activate(
+            address(coin),
+            address(portfolio),
+            address(weightProvider)
+        );
         vault = Vault(notary.openVault(ETHUSD));
 
         console.log("Vault created!");
@@ -91,9 +106,27 @@ contract UniV3Test is Test {
         dai.approve(address(vault), amountToMint2);
         link.approve(address(vault), amountToMint3);
 
-        vault.addOneCollateral(address(weth), amountToMint1, WETHdecimals, address(priceFeedEthUsd), "USD");
-        vault.addOneCollateral(address(dai), amountToMint2, DAIdecimals, address(priceFeedDaiEth), "ETH");
-        vault.addOneCollateral(address(link), amountToMint3, LINKdecimals, address(priceFeedLinkEth), "ETH");
+        vault.addOneCollateral(
+            address(weth),
+            amountToMint1,
+            WETHdecimals,
+            address(priceFeedEthUsd),
+            "USD"
+        );
+        vault.addOneCollateral(
+            address(dai),
+            amountToMint2,
+            DAIdecimals,
+            address(priceFeedDaiEth),
+            "ETH"
+        );
+        vault.addOneCollateral(
+            address(link),
+            amountToMint3,
+            LINKdecimals,
+            address(priceFeedLinkEth),
+            "ETH"
+        );
 
         vault.updateStrategy(2);
 
@@ -106,9 +139,14 @@ contract UniV3Test is Test {
     }
 
     function testupdateCollateralPortfolio() public {
-        notary.updateAssetsAndPortfolio(
-            _assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies, WETH, 3000
+        notary.updateAssets(
+            _assetsAddress,
+            _targetWeights,
+            _decimals,
+            _priceFeeds,
+            _baseCurrencies
         );
+        notary.updatePortfolio();
         address receiver = address(1);
         // vault.updateCollateralPortfolio(WETH, 3000);
         console.log(address(vault.getTokens(receiver)[0]));

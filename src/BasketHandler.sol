@@ -83,18 +83,27 @@ library BasketLib {
         for (uint256 i = 0; i < length; ++i) {
             self.erc20s.push(other.erc20s[i]);
             self.tokenAmts[other.erc20s[i]] = other.tokenAmts[other.erc20s[i]];
-            self.weightsInPercent[other.erc20s[i]] = other.weightsInPercent[other.erc20s[i]];
-            self.priceFeedBasket[other.erc20s[i]] = other.priceFeedBasket[other.erc20s[i]];
+            self.weightsInPercent[other.erc20s[i]] = other.weightsInPercent[
+                other.erc20s[i]
+            ];
+            self.priceFeedBasket[other.erc20s[i]] = other.priceFeedBasket[
+                other.erc20s[i]
+            ];
         }
     }
 
-    function updateWeights(Basket storage self, AggregatorV3Interface _priceFeedBenchmark) internal {
+    function updateWeights(
+        Basket storage self,
+        AggregatorV3Interface _priceFeedBenchmark
+    ) internal {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
             IERC20 _tok = self.erc20s[i];
-            self.weightsInPercent[_tok] = (
-                (getSingleBalance(self, _tok, _priceFeedBenchmark) * 100) / getBasketBalance(self, _priceFeedBenchmark)
-            );
+            self.weightsInPercent[_tok] = ((getSingleBalance(
+                self,
+                _tok,
+                _priceFeedBenchmark
+            ) * 100) / getBasketBalance(self, _priceFeedBenchmark));
         }
     }
 
@@ -123,9 +132,12 @@ library BasketLib {
         updateWeights(self, _priceFeedBenchmark);
     }
 
-    function reduce(Basket storage self, IERC20 _tok, uint256 _amount, AggregatorV3Interface _priceFeedBenchmark)
-        internal
-    {
+    function reduce(
+        Basket storage self,
+        IERC20 _tok,
+        uint256 _amount,
+        AggregatorV3Interface _priceFeedBenchmark
+    ) internal {
         if (_amount == FIX_ZERO) return;
         if (self.tokenAmts[_tok] == _amount) {
             empty(self, _tok);
@@ -144,24 +156,30 @@ library BasketLib {
         empty(self);
     }
 
-    function getSingleBalance(Basket storage self, IERC20 token, AggregatorV3Interface _priceFeedBenchmark)
-        internal
-        view
-        returns (uint256 balance)
-    {
+    function getSingleBalance(
+        Basket storage self,
+        IERC20 token,
+        AggregatorV3Interface _priceFeedBenchmark
+    ) internal view returns (uint256 balance) {
         balance = self.tokenAmts[token].getConversionRate(
-            self.priceFeedBasket[token], self.decimals[token], _priceFeedBenchmark, self.baseCurrency[token]
+            self.priceFeedBasket[token],
+            self.decimals[token],
+            _priceFeedBenchmark,
+            self.baseCurrency[token]
         );
     }
 
-    function getBasketBalance(Basket storage self, AggregatorV3Interface _priceFeedBenchmark)
-        internal
-        view
-        returns (uint256 balance)
-    {
+    function getBasketBalance(
+        Basket storage self,
+        AggregatorV3Interface _priceFeedBenchmark
+    ) internal view returns (uint256 balance) {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
-            balance += getSingleBalance(self, self.erc20s[i], _priceFeedBenchmark);
+            balance += getSingleBalance(
+                self,
+                self.erc20s[i],
+                _priceFeedBenchmark
+            );
         }
     }
 }

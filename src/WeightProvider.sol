@@ -2,7 +2,9 @@
 pragma solidity 0.8.17;
 
 import {Functions, FunctionsClient} from "./dev/functions/FunctionsClient.sol";
-import {Notary} from "./Notary.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IWeightProvider} from "./IWeightProvider.sol";
+import {INotary} from "./INotary.sol";
 
 /**
  * @dev Notary contract registers and authenticates Positions.
@@ -10,14 +12,44 @@ import {Notary} from "./Notary.sol";
  * This contract allows users to open positions, which can be verified
  * during the minting of the stablecoin.
  */
-contract WeightProvider is FunctionsClient {
+contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
+    using Functions for Functions.Request;
+
     string public source =
         "var b=await Functions.makeHttpRequest({url:'https://www.signdb.com/.netlify/functions/optimize'});return Functions.encodeUint256(Math.round(b.data['weight']));";
+    INotary notary;
+    uint64 subId;
+    address wethAddress;
+    uint24 poolFee = 3000;
+    uint32 functionsGasLimit = 500_000;
+    uint256 mostRecentWeight;
 
-    Notary notary;
+    constructor(
+        address _oracleAddress,
+        address _notaryAddress,
+        address _wethAddress
+    ) FunctionsClient(_oracleAddress) {
+        notary = INotary(_notaryAddress);
+        wethAddress = _wethAddress;
+    }
 
-    constructor(address _oracleAddress, address _notaryAddress) FunctionsClient(_oracleAddress) {
-        notary = Notary(_notaryAddress);
+    function setSubId(uint64 _subId) public onlyOwner {
+        subId = _subId;
+    }
+
+    function setFunctionsGasLimit(uint32 _functionsGasLimit) public onlyOwner {
+        functionsGasLimit = _functionsGasLimit;
+    }
+
+    function executeRequest() external override returns (bytes32) {
+        require(subId != 0, "Subscription ID must be set before redeeming");
+        Functions.Request memory req;
+        req.initializeRequest(
+            Functions.Location.Inline,
+            Functions.CodeLanguage.JavaScript,
+            source
+        );
+        return sendRequest(req, subId, functionsGasLimit);
     }
 
     /**
@@ -27,7 +59,15 @@ contract WeightProvider is FunctionsClient {
      * @param err Aggregated error from the user code or from the execution pipeline
      * Either response or error parameter will be set, but never both
      */
-    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
+    function fulfillRequest(
+        bytes32 requestId,
+        bytes memory response,
+        bytes memory err
+    ) internal override {
         uint256 weight = uint256(bytes32(response));
+        uint256[] memory weights;
+        weights[0] = weight;
+        mostRecentWeight = weight;
+        //        notary.updateAssetsAndPortfolioTestnet(weights, wethAddress, poolFee);
     }
 }

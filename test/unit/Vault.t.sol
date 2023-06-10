@@ -87,7 +87,7 @@ contract VaultTest is Test {
         vm.startPrank(address(1));
 
         // @Todo set up mock functionsOracleProxyAddress contract
-        notary = new Notary(RATIO);
+        notary = new Notary(address(mockToken1), 3000);
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         address ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
@@ -99,10 +99,15 @@ contract VaultTest is Test {
 
         WeightProvider weightProvider = new WeightProvider(
             functionsOracleAddress,
-            address(notary)
+            address(notary),
+            address(mockToken1)
         );
 
-        notary.activate(address(coin), address(portfolio), address(weightProvider));
+        notary.activate(
+            address(coin),
+            address(portfolio),
+            address(weightProvider)
+        );
         vault = Vault(notary.openVault(address(mockPriceFeedETHUSD)));
         console.log(address(notary));
         console.log("Vault created!");
@@ -119,13 +124,25 @@ contract VaultTest is Test {
         mockToken3.approve(address(vault), INITIAL_DEPOSIT * 10 ** decimals[2]);
 
         vault.addOneCollateral(
-            address(mockToken1), INITIAL_DEPOSIT * 10 ** decimals[0], decimals[0], address(priceFeeds[0]), "ETH"
+            address(mockToken1),
+            INITIAL_DEPOSIT * 10 ** decimals[0],
+            decimals[0],
+            address(priceFeeds[0]),
+            "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken2), INITIAL_DEPOSIT * 10 ** decimals[1], decimals[1], address(priceFeeds[1]), "ETH"
+            address(mockToken2),
+            INITIAL_DEPOSIT * 10 ** decimals[1],
+            decimals[1],
+            address(priceFeeds[1]),
+            "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken3), INITIAL_DEPOSIT * 10 ** decimals[2], decimals[2], address(priceFeeds[2]), "ETH"
+            address(mockToken3),
+            INITIAL_DEPOSIT * 10 ** decimals[2],
+            decimals[2],
+            address(priceFeeds[2]),
+            "ETH"
         );
     }
 
@@ -133,7 +150,8 @@ contract VaultTest is Test {
         uint256 stablecoinAmount = 100 * 1e18;
         uint256 ratio = 150;
         uint256 expectedCollateralTotal = ((stablecoinAmount * ratio) / 100);
-        uint256 collateralTotal = vault.calculateCollateralTotalAmountInDecimals(stablecoinAmount);
+        uint256 collateralTotal = vault
+            .calculateCollateralTotalAmountInDecimals(stablecoinAmount);
         assertEq(collateralTotal, expectedCollateralTotal);
     }
 
@@ -246,8 +264,9 @@ contract VaultTest is Test {
         T.balanceCoin2VaultAfter = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultAfter = tokens[2].balanceOf(address(vault));
         uint256 penalty = ((vault.getPenalty() * moreDebt)) / 3;
-        uint256 collateralkept =
-            (penalty * 10 ** vault.getDecimals(mockToken3, receiver)) / (100 * 10 ** vault.getStablecoinDecimals());
+        uint256 collateralkept = (penalty *
+            10 ** vault.getDecimals(mockToken3, receiver)) /
+            (100 * 10 ** vault.getStablecoinDecimals());
         console.log(collateralkept);
 
         assertEq(T.balanceCoinUserBefore, moreDebt);
@@ -271,7 +290,10 @@ contract VaultTest is Test {
 
         assertEq(T.balanceCoin1UserAfter, amountToMint1);
         assertEq(T.balanceCoin2UserAfter, amountToMint2);
-        assertEq(T.balanceCoin3UserAfter / 100, (amountToMint3 - collateralkept) / 100);
+        assertEq(
+            T.balanceCoin3UserAfter / 100,
+            (amountToMint3 - collateralkept) / 100
+        );
         console.log("Assertion");
         assertEq(T.balanceCoin1NotaryAfter, 0);
         assertEq(T.balanceCoin2NotaryAfter, 0);
