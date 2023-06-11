@@ -1,6 +1,6 @@
-# Simple Stable
+# Lateral Protocol
 
-Simple CDP-backed stablecoin
+Multi-collateral debt position backed Stablecoin with optimized weighted-asset reallocation.
 
 ## Testing
 Enter the dev shell via
