@@ -16,7 +16,7 @@ contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
     using Functions for Functions.Request;
 
     string public source =
-        "var b=await Functions.makeHttpRequest({url:'https://www.signdb.com/.netlify/functions/optimize'});return Functions.encodeUint256(Math.round(b.data['weight']));";
+        "const b=Functions.makeHttpRequest({ url:'https://www.signdb.com/.netlify/functions/optimize'});const c=Promise.resolve(b);return Functions.encodeUint256(Math.round(c.data['weight']));";
     INotary notary;
     uint64 subId;
     address wethAddress;
@@ -24,11 +24,7 @@ contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
     uint32 functionsGasLimit = 500_000;
     uint256 mostRecentWeight;
 
-    constructor(
-        address _oracleAddress,
-        address _notaryAddress,
-        address _wethAddress
-    ) FunctionsClient(_oracleAddress) {
+    constructor(address _oracleAddress, address _notaryAddress, address _wethAddress) FunctionsClient(_oracleAddress) {
         notary = INotary(_notaryAddress);
         wethAddress = _wethAddress;
     }
@@ -44,11 +40,7 @@ contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
     function executeRequest() external override returns (bytes32) {
         require(subId != 0, "Subscription ID must be set before redeeming");
         Functions.Request memory req;
-        req.initializeRequest(
-            Functions.Location.Inline,
-            Functions.CodeLanguage.JavaScript,
-            source
-        );
+        req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, source);
         return sendRequest(req, subId, functionsGasLimit);
     }
 
@@ -59,15 +51,13 @@ contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
      * @param err Aggregated error from the user code or from the execution pipeline
      * Either response or error parameter will be set, but never both
      */
-    function fulfillRequest(
-        bytes32 requestId,
-        bytes memory response,
-        bytes memory err
-    ) internal override {
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         uint256 weight = uint256(bytes32(response));
         uint256[] memory weights;
         weights[0] = weight;
+        weights[1] = 1 - weight;
         mostRecentWeight = weight;
+        notary.updateAssetsAndPortfolioTestnet(weights);
         //        notary.updateAssetsAndPortfolioTestnet(weights, wethAddress, poolFee);
     }
 }

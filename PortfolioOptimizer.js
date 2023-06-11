@@ -22,7 +22,6 @@ let portfolio = {
   },
 };
 
-
 let returns, covMatrix;
 
 async function fetchHistoricalData(asset) {
@@ -33,12 +32,12 @@ async function fetchHistoricalData(asset) {
   const url = `https://api.coingecko.com/api/v3/coins/${assetToLower}/market_chart?vs_currency=usd&days=90`;
   const response = await axios.get(url);
 
-  // The response is an object with two arrays: prices and market_caps. 
+  // The response is an object with two arrays: prices and market_caps.
   // We're interested in prices, where each entry is an array: [time, price].
   const prices = response.data.prices;
 
   // We only need the price, not the timestamp, so we map over the prices to get an array of only prices.
-  const closingPrices = prices.map(entry => entry[1]);
+  const closingPrices = prices.map((entry) => entry[1]);
 
   return closingPrices;
 }
@@ -111,7 +110,7 @@ async function calculatePortfolio() {
   let maxSrReturns = retArr[maxSharpeIdx];
   let maxSrVolatility = volArr[maxSharpeIdx];
 
-  return parseInt(allWeights[maxSharpeIdx][0] * 100);
+  return allWeights[maxSharpeIdx][0] * 100;
 }
 
 async function main() {
@@ -120,4 +119,3 @@ async function main() {
 }
 
 main();
-

@@ -22,7 +22,7 @@ contract Coin is ERC20 {
         _;
     }
 
-    constructor(address _notaryAddress) ERC20("Coin", "coin") {
+    constructor(address _notaryAddress) ERC20("LateralProtcol USD", "LATP") {
         notary = Notary(_notaryAddress);
     }
 

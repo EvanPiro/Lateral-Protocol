@@ -11,7 +11,7 @@ import {FunctionsBillingRegistry} from "../src/dev/functions/FunctionsBillingReg
 import {IERC1363} from "lib/openzeppelin-contracts/contracts/interfaces/IERC1363.sol";
 
 // Sepolia
-contract DeployProtocol is Script {
+contract DeployLATProtocol is Script {
     uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
     address deployerAddress = vm.envAddress("DEPLOYER_ADDRESS");
 

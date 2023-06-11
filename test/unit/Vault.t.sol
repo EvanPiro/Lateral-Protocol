@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.17;
 
 import "forge-std/Test.sol";
 import "../Mocks/MockERC20.sol";
@@ -103,11 +103,7 @@ contract VaultTest is Test {
             address(mockToken1)
         );
 
-        notary.activate(
-            address(coin),
-            address(portfolio),
-            address(weightProvider)
-        );
+        notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(address(mockPriceFeedETHUSD)));
         console.log(address(notary));
         console.log("Vault created!");
@@ -124,35 +120,14 @@ contract VaultTest is Test {
         mockToken3.approve(address(vault), INITIAL_DEPOSIT * 10 ** decimals[2]);
 
         vault.addOneCollateral(
-            address(mockToken1),
-            INITIAL_DEPOSIT * 10 ** decimals[0],
-            decimals[0],
-            address(priceFeeds[0]),
-            "ETH"
+            address(mockToken1), INITIAL_DEPOSIT * 10 ** decimals[0], decimals[0], address(priceFeeds[0]), "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken2),
-            INITIAL_DEPOSIT * 10 ** decimals[1],
-            decimals[1],
-            address(priceFeeds[1]),
-            "ETH"
+            address(mockToken2), INITIAL_DEPOSIT * 10 ** decimals[1], decimals[1], address(priceFeeds[1]), "ETH"
         );
         vault.addOneCollateral(
-            address(mockToken3),
-            INITIAL_DEPOSIT * 10 ** decimals[2],
-            decimals[2],
-            address(priceFeeds[2]),
-            "ETH"
+            address(mockToken3), INITIAL_DEPOSIT * 10 ** decimals[2], decimals[2], address(priceFeeds[2]), "ETH"
         );
-    }
-
-    function testCalculateCollateralTotalAmount() public {
-        uint256 stablecoinAmount = 100 * 1e18;
-        uint256 ratio = 150;
-        uint256 expectedCollateralTotal = ((stablecoinAmount * ratio) / 100);
-        uint256 collateralTotal = vault
-            .calculateCollateralTotalAmountInDecimals(stablecoinAmount);
-        assertEq(collateralTotal, expectedCollateralTotal);
     }
 
     function testCanTake() public {
@@ -213,14 +188,14 @@ contract VaultTest is Test {
         address receiver = address(1);
         coin.approve(address(vault), moreDebt);
         vault.take(moreDebt);
-        uint256 tokAmountVBefore = vault.getAmounts(mockToken1, receiver);
-        uint256 tokAmountUBefore = mockToken1.balanceOf(receiver);
+        uint256 tokAmountVBefore = vault.getAmounts(mockToken3, receiver);
+        uint256 tokAmountUBefore = mockToken3.balanceOf(receiver);
 
         vault.RetrieveAll();
-        uint256 tokAmountVAfter = vault.getAmounts(mockToken1, receiver);
-        uint256 tokAmountUAfter = mockToken1.balanceOf(receiver);
+        uint256 tokAmountVAfter = vault.getAmounts(mockToken3, receiver);
+        uint256 tokAmountUAfter = mockToken3.balanceOf(receiver);
 
-        assertEq(tokAmountUAfter, tokAmountVBefore);
+        assertEq(tokAmountUAfter, tokAmountVBefore / 2);
         assertEq(tokAmountVAfter, tokAmountUBefore);
     }
 
@@ -264,9 +239,8 @@ contract VaultTest is Test {
         T.balanceCoin2VaultAfter = tokens[1].balanceOf(address(vault));
         T.balanceCoin3VaultAfter = tokens[2].balanceOf(address(vault));
         uint256 penalty = ((vault.getPenalty() * moreDebt)) / 3;
-        uint256 collateralkept = (penalty *
-            10 ** vault.getDecimals(mockToken3, receiver)) /
-            (100 * 10 ** vault.getStablecoinDecimals());
+        uint256 collateralkept =
+            (penalty * 10 ** vault.getDecimals(mockToken3, receiver)) / (100 * 10 ** vault.getStablecoinDecimals());
         console.log(collateralkept);
 
         assertEq(T.balanceCoinUserBefore, moreDebt);
@@ -290,10 +264,7 @@ contract VaultTest is Test {
 
         assertEq(T.balanceCoin1UserAfter, amountToMint1);
         assertEq(T.balanceCoin2UserAfter, amountToMint2);
-        assertEq(
-            T.balanceCoin3UserAfter / 100,
-            (amountToMint3 - collateralkept) / 100
-        );
+        assertEq(T.balanceCoin3UserAfter / 100, (amountToMint3 - collateralkept) / 100);
         console.log("Assertion");
         assertEq(T.balanceCoin1NotaryAfter, 0);
         assertEq(T.balanceCoin2NotaryAfter, 0);

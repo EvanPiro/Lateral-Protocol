@@ -51,11 +51,11 @@ contract UniV3Test is Test {
     AggregatorV3Interface private priceFeedLinkEth =
         AggregatorV3Interface(LINKETH);
 
-    address[] _assetsAddress = [PAXG, USDC, WBTC];
+    address[] _assetsAddress = [LINK, USDC, WBTC];
     uint256[] _targetWeights = [40, 40, 20];
-    uint8[] _decimals = [PAXGdecimals, USDCdecimals, WBTCdecimals];
+    uint8[] _decimals = [LINKdecimals, USDCdecimals, WBTCdecimals];
     AggregatorV3Interface[] _priceFeeds = [
-        priceFeedPaxGeth,
+        priceFeedLinkEth,
         priceFeedUsdEth,
         priceFeedBtcEth
     ];
@@ -128,7 +128,7 @@ contract UniV3Test is Test {
             "ETH"
         );
 
-        vault.updateStrategy(2);
+        vault.updateStrategy(1);
 
         // portfolio.updateAssets(
         //     _assetsAddress,
@@ -164,6 +164,30 @@ contract UniV3Test is Test {
         console.log(vault.getWeights(vault.getTokens(receiver)[2], receiver));
         console.log(vault.getAmounts(vault.getTokens(receiver)[2], receiver));
         console.log(vault.getDecimals(vault.getTokens(receiver)[2], receiver));
+
+        vault.updateStrategy(2);
+        notary.updatePortfolio();
+        console.log(IERC20(WETH).balanceOf(address(vault)));
+        console.log(IERC20(WETH).balanceOf(address(1)));
+
+        // vault.updateCollateralPortfolio(WETH, 3000);
+        console.log(address(vault.getTokens(receiver)[0]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[0], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[0], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[0], receiver));
+        //console.log(vault.getPriceFeeds(vault.getTokens()[0]));
+        console.log("--");
+        console.log(address(vault.getTokens(receiver)[1]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[1], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[1], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[1], receiver));
+        console.log("--");
+        console.log(address(vault.getTokens(receiver)[2]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[2], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[2], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[2], receiver));
+
+        vault.RetrieveAll();
 
         // console.log("------");
         // console.log(address(vault.getTokens(receiver)[3]));

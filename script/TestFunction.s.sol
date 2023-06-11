@@ -22,9 +22,7 @@ contract DeployProtocol is Script {
 
         // Functions
 
-        WeightProvider weightProvider = WeightProvider(
-            0x3D01BE50fB2f399EF01A8cB60AA6De174f91fCd2
-        );
+        WeightProvider weightProvider = WeightProvider(0x3D01BE50fB2f399EF01A8cB60AA6De174f91fCd2);
         weightProvider.executeRequest();
 
         vm.stopBroadcast();

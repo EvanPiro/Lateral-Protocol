@@ -6,7 +6,7 @@ import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "lib/chainlink/contracts/src/v0.8/interfaces/automation/KeeperCompatibleInterface.sol";
 import "./Vault.sol";
 import "lib/chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol";
-// import "./INotary.sol";
+import "./INotary.sol";
 import "./IWeightProvider.sol";
 
 /**
@@ -16,13 +16,16 @@ import "./IWeightProvider.sol";
  * during the minting of the stablecoin.
  */
 
-contract Notary is Ownable, KeeperCompatibleInterface {
+contract Notary is Ownable, INotary, KeeperCompatibleInterface {
     mapping(address => bool) public isValidPosition;
     address public vaultAddress;
     // Vault[] public vaults;
     // uint256 vaultID;
 
-    event VaultOpened(address vaultAddress);
+    // event VaultOpened(address vaultAddress);
+    event LiquidationAndRebalancing();
+    event NoLiquidation();
+    event RequestFailed();
 
     address public coinAddress;
     address public portfolioAddress;
@@ -82,7 +85,7 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         // vaults.push(vault);
         // vaultID += 1;
 
-        emit VaultOpened(vaultAddress);
+        // emit VaultOpened(vaultAddress);
         return vaultAddress;
     }
 
@@ -102,39 +105,40 @@ contract Notary is Ownable, KeeperCompatibleInterface {
 
     function performUpkeep(bytes calldata /*performData*/) external override {
         (bool upkeepNeeded, ) = checkUpkeep("");
-        require(!upkeepNeeded, "upkeepNeeded not needed");
+        require(upkeepNeeded, "upkeepNeeded not needed");
 
-        liquidateVaults();
+        try weightProvider.executeRequest() {} catch {
+            emit RequestFailed();
+        }
 
-        weightProvider.executeRequest();
+        try this.liquidateVaults() {} catch {
+            emit NoLiquidation();
+        }
 
-        //call execute requests
+        emit LiquidationAndRebalancing();
+
+        // Call execute requests
     }
 
-    // function updateAssetsAndPortfolioTestnet(
-    //     // address[] memory _assetsAddress,
-    //     uint256[] memory _targetWeights // uint8[] memory _decimals, // AggregatorV3Interface[] memory _priceFeeds,
-    // ) external override {
-    //     require(
-    //         msg.sender == address(weightProvider),
-    //         "must be weight provider to provide weight"
-    //     );
-    //     Portfolio(portfolioAddress).updateWeights(_targetWeights);
-    //     Vault vault = Vault(vaultAddress);
-    //     uint256 numUsers = vault.getUsers().length;
-    //     for (uint256 j = 0; j < numUsers; j++) {
-    //         if (
-    //             vault.getStrategy(vault.getUsers()[j]) ==
-    //             Portfolio.STRATEGY.DYNAMIC_MODEL
-    //         ) {
-    //             vault.updateCollateralPortfolio(
-    //                 weth,
-    //                 poolFee,
-    //                 vault.getUsers()[j]
-    //             );
-    //         }
-    //     }
-    // }
+    function updateAssetsAndPortfolioTestnet(
+        // address[] memory _assetsAddress,
+        uint256[] memory _targetWeights // uint8[] memory _decimals, // AggregatorV3Interface[] memory _priceFeeds,
+    ) external override {
+        // require(msg.sender == address(weightProvider), "must be weight provider to provide weight");
+        // Portfolio(portfolioAddress).updateWeights(_targetWeights);
+        // Vault vault = Vault(vaultAddress);
+        // uint256 numUsers = vault.getUsers().length;
+        // for (uint256 j = 0; j < numUsers; j++) {
+        //     bool trigger = vault.getTrigger(vault.getUsers()[j]);
+        //     if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.FIXED_MODEL && trigger == true) {
+        //         vault.updateCollateralPortfolio(weth, poolFee, vault.getUsers()[j]);
+        //         vault.updateTrigger(vault.getUsers()[j]);
+        //     }
+        //     if (vault.getStrategy(vault.getUsers()[j]) == Portfolio.STRATEGY.DYNAMIC_MODEL) {
+        //         vault.updateCollateralPortfolio(weth, poolFee, vault.getUsers()[j]);
+        //     }
+        // }
+    }
 
     function updateAssets(
         address[] memory _assetsAddress,
@@ -156,6 +160,19 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         Vault vault = Vault(vaultAddress);
         uint256 numUsers = vault.getUsers().length;
         for (uint256 j = 0; j < numUsers; j++) {
+            bool trigger = vault.getTrigger(vault.getUsers()[j]);
+            if (
+                vault.getStrategy(vault.getUsers()[j]) ==
+                Portfolio.STRATEGY.FIXED_MODEL &&
+                trigger == true
+            ) {
+                vault.updateCollateralPortfolio(
+                    weth,
+                    poolFee,
+                    vault.getUsers()[j]
+                );
+                vault.updateTrigger(vault.getUsers()[j]);
+            }
             if (
                 vault.getStrategy(vault.getUsers()[j]) ==
                 Portfolio.STRATEGY.DYNAMIC_MODEL
@@ -175,13 +192,5 @@ contract Notary is Ownable, KeeperCompatibleInterface {
         for (uint256 j = 0; j < numUsers; j++) {
             vault.liquidate(vault.getUsers()[j]);
         }
-    }
-
-    function getWeth() public returns (address) {
-        return weth;
-    }
-
-    function getPoolFee() public returns (uint24) {
-        return poolFee;
     }
 }

@@ -12,7 +12,7 @@ struct Basket {
     mapping(IERC20 => uint256) weightsInPercent; // {ref/BU}
     mapping(IERC20 => AggregatorV3Interface) priceFeedBasket;
     mapping(IERC20 => string) baseCurrency;
-    bool empty; // The struct is not imported if the bool is not added (solidity bug ?)
+    bool emptyBasket; // The struct is not imported if the bool is not added (solidity bug ?)
 }
 
 /**
@@ -26,7 +26,7 @@ library BasketLib {
 
     using PriceConverter for uint256;
 
-    function empty(Basket storage self, IERC20 token) internal {
+    function empty(Basket storage self, IERC20 token) public {
         delete self.tokenAmts[token];
         delete self.weightsInPercent[token];
         delete self.priceFeedBasket[token];
@@ -44,7 +44,7 @@ library BasketLib {
     /// Set self to a fresh, empty basket
     // self'.erc20s = [] (empty list)
     // self'.refAmts = {} (empty map)
-    function empty(Basket storage self) internal {
+    function empty(Basket storage self) public {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
             delete self.tokenAmts[self.erc20s[i]];
@@ -83,27 +83,18 @@ library BasketLib {
         for (uint256 i = 0; i < length; ++i) {
             self.erc20s.push(other.erc20s[i]);
             self.tokenAmts[other.erc20s[i]] = other.tokenAmts[other.erc20s[i]];
-            self.weightsInPercent[other.erc20s[i]] = other.weightsInPercent[
-                other.erc20s[i]
-            ];
-            self.priceFeedBasket[other.erc20s[i]] = other.priceFeedBasket[
-                other.erc20s[i]
-            ];
+            self.weightsInPercent[other.erc20s[i]] = other.weightsInPercent[other.erc20s[i]];
+            self.priceFeedBasket[other.erc20s[i]] = other.priceFeedBasket[other.erc20s[i]];
         }
     }
 
-    function updateWeights(
-        Basket storage self,
-        AggregatorV3Interface _priceFeedBenchmark
-    ) internal {
+    function updateWeights(Basket storage self, AggregatorV3Interface _priceFeedBenchmark) internal {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
             IERC20 _tok = self.erc20s[i];
-            self.weightsInPercent[_tok] = ((getSingleBalance(
-                self,
-                _tok,
-                _priceFeedBenchmark
-            ) * 100) / getBasketBalance(self, _priceFeedBenchmark));
+            self.weightsInPercent[_tok] = (
+                (getSingleBalance(self, _tok, _priceFeedBenchmark) * 100) / getBasketBalance(self, _priceFeedBenchmark)
+            );
         }
     }
 
@@ -132,12 +123,9 @@ library BasketLib {
         updateWeights(self, _priceFeedBenchmark);
     }
 
-    function reduce(
-        Basket storage self,
-        IERC20 _tok,
-        uint256 _amount,
-        AggregatorV3Interface _priceFeedBenchmark
-    ) internal {
+    function reduce(Basket storage self, IERC20 _tok, uint256 _amount, AggregatorV3Interface _priceFeedBenchmark)
+        internal
+    {
         if (_amount == FIX_ZERO) return;
         if (self.tokenAmts[_tok] == _amount) {
             empty(self, _tok);
@@ -156,30 +144,62 @@ library BasketLib {
         empty(self);
     }
 
-    function getSingleBalance(
-        Basket storage self,
-        IERC20 token,
-        AggregatorV3Interface _priceFeedBenchmark
-    ) internal view returns (uint256 balance) {
+    function getSingleBalance(Basket storage self, IERC20 token, AggregatorV3Interface _priceFeedBenchmark)
+        internal
+        view
+        returns (uint256 balance)
+    {
         balance = self.tokenAmts[token].getConversionRate(
-            self.priceFeedBasket[token],
-            self.decimals[token],
-            _priceFeedBenchmark,
-            self.baseCurrency[token]
+            self.priceFeedBasket[token], self.decimals[token], _priceFeedBenchmark, self.baseCurrency[token]
         );
     }
 
-    function getBasketBalance(
-        Basket storage self,
-        AggregatorV3Interface _priceFeedBenchmark
-    ) internal view returns (uint256 balance) {
+    function getBasketBalance(Basket storage self, AggregatorV3Interface _priceFeedBenchmark)
+        internal
+        view
+        returns (uint256 balance)
+    {
         uint256 length = self.erc20s.length;
         for (uint256 i = 0; i < length; ++i) {
-            balance += getSingleBalance(
-                self,
-                self.erc20s[i],
-                _priceFeedBenchmark
-            );
+            balance += getSingleBalance(self, self.erc20s[i], _priceFeedBenchmark);
         }
+    }
+
+    function getTokenAmountsToSend(
+        Basket storage self,
+        uint256 positiveRemainingCollateralInDecimals,
+        AggregatorV3Interface s_priceFeedBenchmark
+    ) public view returns (uint256[] memory) {
+        uint256[] memory tokenAmountstoSend = new uint256[](self.erc20s.length);
+        for (uint256 i = 0; i < self.erc20s.length; i++) {
+            uint256 tokenBalance = self.tokenAmts[self.erc20s[i]];
+            uint256 tokenValueInUSD = PriceConverter.getConversionRate(
+                tokenBalance,
+                self.priceFeedBasket[self.erc20s[i]],
+                self.decimals[self.erc20s[i]],
+                s_priceFeedBenchmark,
+                self.baseCurrency[self.erc20s[i]]
+            );
+
+            if (positiveRemainingCollateralInDecimals <= tokenValueInUSD) {
+                tokenAmountstoSend[i] = (positiveRemainingCollateralInDecimals * 10 ** self.decimals[self.erc20s[i]])
+                    / PriceConverter.getPrice(self.priceFeedBasket[self.erc20s[i]]);
+                // s_collateral[_user].erc20s[i].transfer(_user, tokenAmountstoSend[i]);
+                // s_collateral[_user].tokenAmts[
+                //     s_collateral[_user].erc20s[i]
+                // ] -= tokenAmountstoSend[i];
+                break;
+            } else {
+                tokenAmountstoSend[i] = (
+                    tokenValueInUSD / PriceConverter.getPrice(self.priceFeedBasket[self.erc20s[i]])
+                ) * 10 ** self.decimals[self.erc20s[i]];
+                // s_collateral[_user].erc20s[i].transfer(_user, tokenAmountstoSend[i]);
+                // s_collateral[_user].tokenAmts[
+                //     s_collateral[_user].erc20s[i]
+                // ] -= tokenAmountstoSend[i];
+                positiveRemainingCollateralInDecimals -= tokenValueInUSD;
+            }
+        }
+        return tokenAmountstoSend;
     }
 }
