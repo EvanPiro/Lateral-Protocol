@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+//SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 import {Functions, FunctionsClient} from "./dev/functions/FunctionsClient.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IWeightProvider} from "./IWeightProvider.sol";
 import {INotary} from "./INotary.sol";
+import {Portfolio} from "./Portfolio.sol";
 
 /**
  * @dev Notary contract registers and authenticates Positions.
@@ -54,10 +55,12 @@ contract WeightProvider is Ownable, IWeightProvider, FunctionsClient {
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         uint256 weight = uint256(bytes32(response));
         uint256[] memory weights;
+        Portfolio portfolio = Portfolio(notary.getPortfolioAddress());
         weights[0] = weight;
         weights[1] = 1 - weight;
         mostRecentWeight = weight;
-        notary.updateAssetsAndPortfolioTestnet(weights);
-        //        notary.updateAssetsAndPortfolioTestnet(weights, wethAddress, poolFee);
+        portfolio.updateWeights(weights);
+        // portfolio.updateAssets(_assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies);
+        notary.updatePortfolio();
     }
 }

@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./BasketHandler.sol";
 import "forge-std/Test.sol";
 
+/**
+ * @title Library that handle price conversion for basket and uint types
+ * @dev This library implements Chainlink oracles.
+ * getConversionRate will systematically convert to USD even if the base currency is not USD.
+ *
+ */
 library PriceConverter {
     function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {
         (, int256 answer,,,) = priceFeed.latestRoundData();
@@ -24,11 +30,6 @@ library PriceConverter {
         for (uint256 i = 0; i < length; ++i) {
             tokens[i] = basketOfTokens.erc20s[i];
             prices[i] = getPrice(basketOfTokens.priceFeedBasket[basketOfTokens.erc20s[i]]);
-
-            // ETH/USD rate in 18 digit
-            // answer is in decimal digits
-            // or (Both will do the same thing)
-            // return uint256(answer * 1e10); // 1* 10 ** 10 == 10000000000
         }
         return (tokens, prices);
     }
@@ -50,7 +51,6 @@ library PriceConverter {
         return tokenAmountInUsd;
     }
 
-    // 1000000000
     function getConversionRateOfBasket(
         Basket storage self,
         AggregatorV3Interface priceFeedEth,
@@ -66,9 +66,6 @@ library PriceConverter {
                 priceFeedEth,
                 baseCurrency
             );
-            // or (Both will do the same thing)
-            // uint256 ethAmountInUsd = (ethPrice * ethAmount) / 1e18; // 1 * 10 ** 18 == 1000000000000000000
-            // the actual ETH/USD conversion rate, after adjusting the extra 0s.
         }
         return price;
     }

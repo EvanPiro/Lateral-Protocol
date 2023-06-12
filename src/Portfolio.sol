@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v4.8.0) (token/ERC20/ERC20.sol)
 
 pragma solidity 0.8.17;
 
 // import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import "lib/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "./Notary.sol";
-import "./BasketHandler.sol";
-import "./PriceConverter.sol";
-import "./Vault.sol";
+import {IUniswapV2Router02} from "lib/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Notary} from "./Notary.sol";
+import {Basket} from "./libraries/BasketHandler.sol";
+import "./libraries/PriceConverter.sol";
+import {Vault} from "./Vault.sol";
 
+/**
+ * @title Portfolio contract updates the basket collateral portfolio into new target assets.
+ * @notice This contract can update the targets assets and swap old tokens for new ones.
+ * @dev This contract implements uniswapV2/V3 swap functions to swap tokens.
+ */
 contract Portfolio is Ownable {
     enum STRATEGY {
         NONE,
@@ -22,46 +26,57 @@ contract Portfolio is Ownable {
     uint256[] private s_tokenAmounts;
     uint256[] private s_targetWeights;
     uint8[] private s_decimals;
+    AggregatorV3Interface[] private s_priceFeeds;
     string[] private s_baseCurrencies;
     mapping(address => STRATEGY) private s_strategy;
-    AggregatorV3Interface[] public s_priceFeeds;
 
     uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
     uint160 internal constant MIN_SQRT_RATIO = 4295128739;
     // ISwapRouter immutable i_router;
     IUniswapV2Router02 immutable i_routerV2;
     address immutable i_notary;
+    address immutable i_weightProvider;
 
     event RebalanceEvent(STRATEGY strategy);
-
-    // Basket targetAssets;
 
     modifier onlyNotary() {
         require(msg.sender == i_notary, "Only the notary can call this function");
         _;
     }
 
-    modifier onlyAuthorized() {
-        require(Notary(i_notary).isValidPosition(msg.sender), "Caller is not authorized");
+    modifier onlyOwnerOrWeightProvider() {
+        require(
+            msg.sender == owner() || msg.sender == i_weightProvider,
+            "Only the owner or weightProvider can call this function"
+        );
         _;
     }
 
-    constructor(address _uniswapV2Router, address _notaryAddress) {
+    modifier onlyAuthorized() {
+        require(Notary(i_notary).isValidVault(msg.sender), "Caller is not authorized");
+        _;
+    }
+
+    constructor(address _uniswapV2Router, address _notaryAddress, address _weightProvider) {
         // i_router = ISwapRouter(_uniswapV3Router);
         i_routerV2 = IUniswapV2Router02(_uniswapV2Router);
         i_notary = _notaryAddress;
-        // for (uint256 i = 0; i < length; ++i) {
-        //     targetAssets.add(tokens[i], decimals[i], weights[i], priceFeeds[i]);
-        // }
+        i_weightProvider = _weightProvider;
     }
 
+    /**
+     * @dev Updates the targets Assets by providing the tokens addresses, weights ...
+     * The goal is to have this function be automatically called and updated, without providing any data.
+     * A chainlink function will call an API that executes a model which will chose the target assets and weights.
+     * We are currently trying to find a way to make the Chainlink request return an array rather than int.
+     */
     function updateAssets(
         address[] memory _assetsAddress,
         uint256[] memory _targetWeights,
         uint8[] memory _decimals,
         AggregatorV3Interface[] memory _priceFeeds,
         string[] memory _baseCurrencies
-    ) public onlyNotary {
+    ) public onlyOwnerOrWeightProvider {
         s_assetsAddress = _assetsAddress;
         s_targetWeights = _targetWeights;
         s_priceFeeds = _priceFeeds;
@@ -69,10 +84,19 @@ contract Portfolio is Ownable {
         s_baseCurrencies = _baseCurrencies;
     }
 
-    function updateWeights(uint256[] memory _targetWeights) public onlyNotary {
+    /**
+     * @dev Updates only the weights of the target assets. Currently the Chainlink request function
+     * can only retrieve one interger. Currently the portfolio can only be rebalanced into 2 assets.
+     * The other weight will be calculated using the first one retrieved.
+     */
+    function updateWeights(uint256[] memory _targetWeights) public onlyOwnerOrWeightProvider {
         s_targetWeights = _targetWeights;
     }
 
+    /**
+     * @dev Function to swap tokens.
+     * It uses the swapExactTokensForTokens from UniswapV2.
+     */
     function swapSingleHopExactAmountInV2(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin)
         internal
         returns (uint256 amountOut)
@@ -92,6 +116,11 @@ contract Portfolio is Ownable {
         return amounts[1];
     }
 
+    /**
+     * @dev Function to swap tokens.
+     * It uses the swapExactTokensForTokens from UniswapV3.
+     * Currently we are favoring UniswapV2 because more liquid pools exist there.
+     */
     // function swapExactInputSingleHop(
     //     address tokenIn,
     //     address tokenOut,
@@ -117,6 +146,10 @@ contract Portfolio is Ownable {
     //     amountOut = i_router.exactInputSingle(params);
     // }
 
+    /**
+     * @dev Calculates the amounts that will be used for each swap.
+     * It corresponds to the amountIn in the Uniswap Function.
+     */
     function calculateTargetInputs(uint256 totalAmountInDecimals, uint256[] memory targetWeights)
         public
         pure
@@ -129,6 +162,13 @@ contract Portfolio is Ownable {
         }
     }
 
+    /**
+     * @dev Function that will do all the rebalancing.
+     * Can only be called by authenticated vault contracts.
+     * It will perform two series of swaps:
+     * 1. Swap everything to Weth
+     * 2. Swap to targets assets using the target Amounts calculated via calculateTargetInputs() function
+     */
     function rebalancePortfolio(Vault vault, address weth, uint24 _poolFee, address _user) external onlyAuthorized {
         uint256 length = vault.getTokens(_user).length;
         // Rebalance the portfolio by swapping assets
@@ -138,13 +178,6 @@ contract Portfolio is Ownable {
                 wethAmount += vault.getAmounts(vault.getTokens(_user)[i], _user);
                 continue;
             } else {
-                // swapExactInputSingleHop(
-                //     address(vault.getTokens(_user)[i]),
-                //     weth,
-                //     _poolFee,
-                //     vault.getAmounts(vault.getTokens(_user)[i], _user),
-                //     true
-                // );
                 wethAmount += swapSingleHopExactAmountInV2(
                     address(vault.getTokens(_user)[i]), weth, vault.getAmounts(vault.getTokens(_user)[i], _user), 0
                 );
@@ -157,58 +190,15 @@ contract Portfolio is Ownable {
         for (uint256 i = 0; i < lengthW; i++) {
             if (s_assetsAddress[i] == weth) {
                 s_tokenAmounts.push(targetAmountsInDecimals[i]);
-            }
-            // s_tokenAmounts.push(
-            //     swapExactInputSingleHop(
-            //         weth,
-            //         s_assetsAddress[i],
-            //         _poolFee,
-            //         targetAmountsInDecimals[i],
-            //         false
-            //     )
-            // );
-            else {
+            } else {
                 s_tokenAmounts.push(
                     swapSingleHopExactAmountInV2(weth, s_assetsAddress[i], targetAmountsInDecimals[i], 0)
                 );
             }
         }
-        // uint256 wethBalance = IERC20(weth).balanceOf(address(vault));
-        // if (wethBalance > 0) {
-        //     s_tokenAmounts.push(wethBalance);
-        //     s_assetsAddress.push(weth);
-        //     s_targetWeights.push(0);
-        //     s_decimals.push(18);
-        //     s_priceFeeds.push(vault.getBenchmarkFeed(_user));
-        //     s_baseCurrencies.push("USD");
-        // }
-        // uint256 lengthV = vault.getTokens(_user).length;
-        // for (uint256 i = 0; i < lengthV; ++i) {
-        //     uint256 token1Balance = IERC20(vault.getTokens(_user)[i]).balanceOf(
-        //         address(vault)
-        //     );
-        //     // console.log("************");
-        //     // console.log(token1Balance);
-        //     if (address(vault.getTokens(_user)[i]) != weth) {
-        //         // uint256 token1Balance = IERC20(vault.getTokens()[i]).balanceOf(
-        //         //     address(vault)
-        //         // );
-        //         // console.log("************");
-        //         // console.log(token1Balance);
-        //         if (token1Balance > 0) {
-        //             s_tokenAmounts.push(token1Balance);
-        //             s_assetsAddress.push(address(vault.getTokens(_user)[i]));
-        //             s_targetWeights.push(1);
-        //             s_decimals.push(
-        //                 vault.getDecimals(vault.getTokens(_user)[i], _user)
-        //             );
-        //             s_priceFeeds.push(
-        //                 vault.getPriceFeeds(vault.getTokens(_user)[i], _user)
-        //             );
-        //         }
-        //     }
-        // }
     }
+
+    //getter functions
 
     function getSqrtPriceLimitX96(bool zeroForOne) internal pure returns (uint160) {
         return zeroForOne ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1;

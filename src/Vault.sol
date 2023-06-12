@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: UNLICENSED
+//SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import "./BasketHandler.sol";
-import "./PriceConverter.sol";
-import "./Coin.sol";
+import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {AggregatorV3Interface} from "lib/chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "./libraries/BasketHandler.sol";
+import "./libraries/PriceConverter.sol";
+import {Coin} from "./Coin.sol";
 import "./Portfolio.sol";
 
 /**
@@ -14,20 +14,17 @@ import "./Portfolio.sol";
  *
  * This contract provides the means for an account to manage their debt position
  * through enforcing adequate collatoralization while withdrawing debt tokens.
+ * Can also update the rebalancing strategy from the collateral basket portfolio
  */
 contract Vault is Ownable {
     using BasketLib for Basket;
     using PriceConverter for Basket;
 
     mapping(address => uint256) private s_debt;
-    // uint256 private s_debt; // In coins amount
     mapping(address => bool) private s_isInsolvent;
-    // bool private s_isInsolvent;
     mapping(address => Basket) private s_collateral;
-    // Basket private s_collateral;
     address[] private s_users;
     mapping(address => uint256) private s_lastTimeStamp;
-    // uint256 private s_lastTimeStamp;
     mapping(address => Portfolio.STRATEGY) private s_strategy;
     address private s_notary;
     Portfolio public s_portfolio;
@@ -58,6 +55,15 @@ contract Vault is Ownable {
         _;
     }
 
+    modifier onlyNotaryOrWeightProvider() {
+        require(
+            msg.sender == s_notary ||
+                msg.sender == address(Notary(s_notary).weightProvider()),
+            "Only the notary can call this function"
+        );
+        _;
+    }
+
     constructor(
         address _coinAddress,
         address _notary,
@@ -65,9 +71,6 @@ contract Vault is Ownable {
         address _priceFeedBenchmark
     ) {
         i_coin = Coin(_coinAddress);
-        // s_user = _user;
-        s_debt[msg.sender] = 0;
-        // s_lastTimeStamp[msg.sender] = block.timestamp;
         s_isInsolvent[msg.sender] = false;
         s_notary = _notary;
         i_stablecoin_decimals = i_coin.decimals();
@@ -75,6 +78,21 @@ contract Vault is Ownable {
         s_priceFeedBenchmark = AggregatorV3Interface(_priceFeedBenchmark);
     }
 
+    /**
+     * @notice Add one collateral in the basket
+     * @param _tokenAddress the address of the token
+     * @param _amount amount to send
+     * @param _decimal decimals of the token (example 18 for WETH)
+     * @param _priceFeed a pricefeed (needs to start with the tok/...)
+     * @param _baseCurrency the base currency of the price feed
+     *
+     * @dev After developping the UI, we will create a list of allowed tokens
+     * The available tokens needs to have a chainlink oracle and,
+     * have a liquid uniswap pool for trading.
+     * The users will only have to chose a token and add amount.
+     * The other parameters will be automatically mapped.
+     * Once the UI is done, this function will become onlyOwner
+     */
     function addOneCollateral(
         address _tokenAddress,
         uint256 _amount,
@@ -108,6 +126,10 @@ contract Vault is Ownable {
         emit CollateralAdded(_tokenAddress, _amount);
     }
 
+    /**
+     * @dev Add several collaterals in the basket at the same time
+     * Can be useful in a UI
+     */
     // function addBasketCollateral(
     //     address[] memory _tokenAddress,
     //     uint256[] memory _tokenAmts,
@@ -151,7 +173,7 @@ contract Vault is Ownable {
 
     /**
      * @dev Takes out loan against collateral if the vault is solvent
-     *  An approve function needs to be added in case of liquidation
+     *  An approve function needs to be executed in case of liquidation
      */
     function take(uint256 _moreDebt) public {
         require(
@@ -178,101 +200,121 @@ contract Vault is Ownable {
      */
     function liquidate(address _user) public onlyNotary {
         uint256 cRatio = getCurrentRatio(_user);
-        require(cRatio < 2000, "Position is collateralized");
-        require(s_isInsolvent[_user] == false);
+        if (cRatio < RATIO) {
+            require(s_isInsolvent[_user] == false);
 
-        // Pause the contract until liquidation process is finished
-        s_isInsolvent[_user] == true;
+            // Pause the contract until liquidation process is finished
+            s_isInsolvent[_user] == true;
 
-        // 1. Receive Loan Stablecoins from the debtor
-        // uint256 stablecoinAmount = coin.balanceOf(msg.sender);
-        // Need to check available tokens
-        // Aprove function needs to be added in the take loan function
-        uint256 totalCollateralInDecimals = TotalBalanceInDecimals(_user);
-        uint256 accruedInterest = getAccruedInterest(_user);
-        uint256 penalty = getLiquidationPenalty(_user);
+            // 1. Receive Loan Stablecoins from the debtor
+            // uint256 stablecoinAmount = coin.balanceOf(msg.sender);
+            // Need to check available tokens
+            // Aprove function needs to be added in the take loan function
+            uint256 totalCollateralInDecimals = TotalBalanceInDecimals(_user);
+            uint256 accruedInterest = getAccruedInterest(_user);
+            uint256 penalty = getLiquidationPenalty(_user);
 
-        uint256 stablecoinBalance = i_coin.balanceOf(_user);
-        if (s_debt[_user] > stablecoinBalance) {
-            if (stablecoinBalance > 0) {
-                i_coin.transferFrom(_user, address(this), stablecoinBalance);
+            uint256 stablecoinBalance = i_coin.balanceOf(_user);
+            if (s_debt[_user] > stablecoinBalance) {
+                if (stablecoinBalance > 0) {
+                    i_coin.transferFrom(
+                        _user,
+                        address(this),
+                        stablecoinBalance
+                    );
+                }
+                s_debt[_user] -= stablecoinBalance;
+            } else {
+                i_coin.transferFrom(_user, address(this), s_debt[_user]);
+                s_debt[_user] = 0;
             }
-            s_debt[_user] -= stablecoinBalance;
-        } else {
-            i_coin.transferFrom(_user, address(this), s_debt[_user]);
-            s_debt[_user] = 0;
-        }
 
-        // 2. Return Remaining Collateral to the debtor (after deducting fee)
-        // If available stables < debt, reduce the collateral by the missing amount
-        // Since this is basket like col, reduce each balance until 0 then repeat
-        int256 remainingCollateralInDecimals = int256(
-            totalCollateralInDecimals
-        ) -
-            int256(accruedInterest) -
-            int256(penalty) -
-            int256(s_debt[_user]);
-        if (remainingCollateralInDecimals < 0) {
-            s_debt[_user] += uint256(-remainingCollateralInDecimals);
-            remainingCollateralInDecimals = 0;
-        } else {
-            uint256 positiveRemainingCollateralInDecimals = uint256(
-                remainingCollateralInDecimals
-            );
-            // Convert the remainingCollateral to token amounts
-            uint256[] memory tokenAmountstoSend = new uint256[](
-                s_collateral[_user].erc20s.length
-            );
-            tokenAmountstoSend = s_collateral[_user].getTokenAmountsToSend(
-                positiveRemainingCollateralInDecimals,
-                s_priceFeedBenchmark
-            );
-
-            for (uint256 i = 0; i < s_collateral[_user].erc20s.length; i++) {
-                s_collateral[_user].erc20s[i].transfer(
-                    _user,
-                    tokenAmountstoSend[i]
+            // 2. Return Remaining Collateral to the debtor (after deducting fee)
+            // If available stables < debt, reduce the collateral by the missing amount
+            // Since this is basket like col, reduce each balance until 0 then repeat
+            int256 remainingCollateralInDecimals = int256(
+                totalCollateralInDecimals
+            ) -
+                int256(accruedInterest) -
+                int256(penalty) -
+                int256(s_debt[_user]);
+            if (remainingCollateralInDecimals < 0) {
+                s_debt[_user] += uint256(-remainingCollateralInDecimals);
+                remainingCollateralInDecimals = 0;
+            } else {
+                uint256 positiveRemainingCollateralInDecimals = uint256(
+                    remainingCollateralInDecimals
                 );
-                s_collateral[_user].tokenAmts[
-                    s_collateral[_user].erc20s[i]
-                ] -= tokenAmountstoSend[i];
+                // Convert the remainingCollateral to token amounts
+                uint256[] memory tokenAmountstoSend = new uint256[](
+                    s_collateral[_user].erc20s.length
+                );
+                tokenAmountstoSend = s_collateral[_user].getTokenAmountsToSend(
+                    positiveRemainingCollateralInDecimals,
+                    s_priceFeedBenchmark
+                );
+
+                for (
+                    uint256 i = 0;
+                    i < s_collateral[_user].erc20s.length;
+                    i++
+                ) {
+                    s_collateral[_user].erc20s[i].transfer(
+                        _user,
+                        tokenAmountstoSend[i]
+                    );
+                    s_collateral[_user].tokenAmts[
+                        s_collateral[_user].erc20s[i]
+                    ] -= tokenAmountstoSend[i];
+                }
             }
-        }
 
-        // 3. Burn Loan Stablecoins (optional)
-        // burn the stablecoins received
-        uint256 receivedDebt = i_coin.balanceOf(address(this));
-        if (receivedDebt > 0) {
-            i_coin.burn(address(this), receivedDebt);
-        }
-        // Send the remaining fees/collateral to the Notary contract
-        for (uint256 i = 0; i < s_collateral[_user].erc20s.length; i++) {
-            IERC20 token = s_collateral[_user].erc20s[i];
-            uint256 tokenBalance = s_collateral[_user].tokenAmts[token];
-            if (tokenBalance > 0) {
-                token.transfer(s_notary, tokenBalance);
+            // 3. Burn Loan Stablecoins (optional)
+            // burn the stablecoins received
+            uint256 receivedDebt = i_coin.balanceOf(address(this));
+            if (receivedDebt > 0) {
+                i_coin.burn(address(this), receivedDebt);
             }
-        }
-        s_collateral[msg.sender].empty();
+            // Send the remaining fees/collateral to the Notary contract
+            for (uint256 i = 0; i < s_collateral[_user].erc20s.length; i++) {
+                IERC20 token = s_collateral[_user].erc20s[i];
+                uint256 tokenBalance = s_collateral[_user].tokenAmts[token];
+                if (tokenBalance > 0) {
+                    token.transfer(s_notary, tokenBalance);
+                }
+            }
+            s_collateral[msg.sender].empty();
 
-        if (s_debt[_user] == 0) {
-            // If all the debt is paid, free this contract once again
-            s_isInsolvent[_user] = false;
-            emit VaultLiquidated();
-        } else {
-            // Lock the contract
-            // The user defaulted and cannot repay debt and/or fees
-            // This case should never happen because collaterallisation is at least 150%
-            // Since approve function has been called
-            // a transferfrom can be sent again to retrieve the missing debt
-            // Once the user gets funds.
-            s_isInsolvent[_user] = true;
+            if (s_debt[_user] == 0) {
+                // If all the debt is paid, free this contract once again
+                s_isInsolvent[_user] = false;
+                uint256 length = s_users.length;
+                for (uint256 i = 0; i < length; i++) {
+                    if (s_users[i] == msg.sender) {
+                        s_users[i] = s_users[length - 1];
+                        s_users.pop();
+                        break;
+                    }
+                }
+                emit VaultLiquidated();
+            } else {
+                // Lock the contract
+                // The user defaulted and cannot repay debt and/or fees
+                // This case should never happen because collaterallisation is at least 150%
+                // Since approve function has been called
+                // a transferfrom can be sent again to retrieve the missing debt
+                // Once the user gets funds.
+                s_isInsolvent[_user] = true;
 
-            s_lastTimeStamp[_user] = block.timestamp;
-            emit UserDefaulted(_user, s_debt[_user]);
+                s_lastTimeStamp[_user] = block.timestamp;
+                emit UserDefaulted(_user, s_debt[_user]);
+            }
         }
     }
 
+    /**
+     * @dev Pay the debt, interest is then added to debt position and clock is rewinded.
+     */
     function payDebt(uint256 _amount) public {
         require(s_debt[msg.sender] >= _amount, "Debt is less than amount");
 
@@ -284,6 +326,9 @@ contract Vault is Ownable {
         s_lastTimeStamp[msg.sender] = block.timestamp;
     }
 
+    /**
+     * @dev Updates the strategy for rebalancing purposes
+     */
     function updateStrategy(uint256 _strategy) public {
         Portfolio.STRATEGY current = getStrategy(msg.sender);
         require(
@@ -294,15 +339,22 @@ contract Vault is Ownable {
         s_trigger[msg.sender] = true;
     }
 
+    /**
+     * @dev Trigger for the rebalancing function
+     */
     function updateTrigger(address _user) public onlyNotary {
         s_trigger[_user] = false;
     }
 
+    /**
+     * @dev Function that calls the rebalancePortfolio() from Portfolio contract
+     * updates the new basket afterwards
+     */
     function updateCollateralPortfolio(
         address weth,
         uint24 _poolFee,
         address _user
-    ) public onlyNotary {
+    ) public onlyNotaryOrWeightProvider {
         uint256 length = s_collateral[_user].erc20s.length;
         for (uint256 i = 0; i < length; i++) {
             s_collateral[_user].erc20s[i].approve(
@@ -324,6 +376,9 @@ contract Vault is Ownable {
         emit RebalanceEvent(getStrategy(_user));
     }
 
+    /**
+     * @dev The user retrieves one collateral depending if health factor is not atteigned.
+     */
     function retrieveCollateral(
         address _tokAddress,
         uint256 _tokAmount
@@ -368,9 +423,24 @@ contract Vault is Ownable {
             _tokAmount,
             s_priceFeedBenchmark
         );
+
+        if (s_collateral[msg.sender].erc20s.length == 0) {
+            uint256 length = s_users.length;
+            for (uint256 i = 0; i < length; i++) {
+                if (s_users[i] == msg.sender) {
+                    s_users[i] = s_users[length - 1];
+                    s_users.pop();
+                    break;
+                }
+            }
+        }
         emit CollateralRetrieved();
     }
 
+    /**
+     * @dev The user retrieves everything. If debt remaining, it will be payed from collateral.
+     * Easy way to get out of position.
+     */
     function RetrieveAll() public {
         // require(s_debt[msg.sender] > 0, "No debt");
         // require(s_debt[msg.sender] <= i_coin.balanceOf(msg.sender), "Balance is lower than debt");
@@ -400,9 +470,20 @@ contract Vault is Ownable {
         }
         s_debt[msg.sender] = 0;
         s_collateral[msg.sender].empty();
+        uint256 length = s_users.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (s_users[i] == msg.sender) {
+                s_users[i] = s_users[length - 1];
+                s_users.pop();
+                break;
+            }
+        }
         emit CollateralRetrieved();
     }
 
+    /**
+     * @dev Calculates the total value of collateral in USD
+     */
     function TotalBalanceInDecimals(
         address _user
     ) public view returns (uint256) {
@@ -432,6 +513,8 @@ contract Vault is Ownable {
                 ((debtInCoins * ERC_DECIMAL) / 10 ** i_stablecoin_decimals)) >=
             RATIO;
     }
+
+    // getter functions
 
     function getAccruedInterest(address _user) public view returns (uint256) {
         return

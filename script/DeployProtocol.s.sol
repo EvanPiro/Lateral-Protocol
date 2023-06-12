@@ -17,8 +17,7 @@ contract DeployLATProtocol is Script {
 
     address linkTokenAddress = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
     address linkPriceFeedAddress = 0x42585eD362B3f1BCa95c640FdFf35Ef899212734;
-    address functionsOracleProxyAddress =
-        0x649a2C205BE7A3d5e99206CEEFF30c794f0E31EC;
+    address functionsOracleProxyAddress = 0x649a2C205BE7A3d5e99206CEEFF30c794f0E31EC;
     address registryProxyAddress = 0x3c79f56407DCB9dc9b852D139a317246f43750Cc;
 
     address wethAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -33,10 +32,8 @@ contract DeployLATProtocol is Script {
     uint8[] _decimals = [18, 18];
     address constant ETHUSD = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
     address constant LINKETH = 0x42585eD362B3f1BCa95c640FdFf35Ef899212734;
-    AggregatorV3Interface private priceFeedEthUsd =
-        AggregatorV3Interface(ETHUSD);
-    AggregatorV3Interface private priceFeedLinkEth =
-        AggregatorV3Interface(LINKETH);
+    AggregatorV3Interface private priceFeedEthUsd = AggregatorV3Interface(ETHUSD);
+    AggregatorV3Interface private priceFeedLinkEth = AggregatorV3Interface(LINKETH);
     AggregatorV3Interface[] _priceFeeds = [priceFeedEthUsd, priceFeedLinkEth];
     string[] _baseCurrencies = ["USD", "ETH"];
 
@@ -52,18 +49,23 @@ contract DeployLATProtocol is Script {
         Notary notary = new Notary(WETH, 3000);
         address notaryAddress = address(notary);
 
-        Coin coin = new Coin(address(notary));
-        address coinAddress = address(coin);
-
-        Portfolio portfolio = new Portfolio(uniswapV2Router, notaryAddress);
-        address portfolioAddress = address(portfolio);
-
         WeightProvider weightProvider = new WeightProvider(
             functionsOracleProxyAddress,
             address(notary),
             wethAddress
         );
+
         address weightProviderAddress = address(weightProvider);
+
+        Coin coin = new Coin(address(notary));
+        address coinAddress = address(coin);
+
+        Portfolio portfolio = new Portfolio(
+            uniswapV2Router,
+            notaryAddress,
+            weightProviderAddress
+        );
+        address portfolioAddress = address(portfolio);
 
         notary.activate(coinAddress, portfolioAddress, weightProviderAddress);
         Vault vault = Vault(notary.openVault(priceFeedBenchmark));
@@ -74,13 +76,7 @@ contract DeployLATProtocol is Script {
         usdt.approve(address(vault), amountToMint1);
         coin.approve(address(vault), amountToMint1);
 
-        notary.updateAssets(
-            _assetsAddress,
-            _targetWeights,
-            _decimals,
-            _priceFeeds,
-            _baseCurrencies
-        );
+        portfolio.updateAssets(_assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies);
 
         // Functions
 

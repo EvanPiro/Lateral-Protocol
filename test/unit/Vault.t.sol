@@ -86,21 +86,20 @@ contract VaultTest is Test {
 
         vm.startPrank(address(1));
 
-        // @Todo set up mock functionsOracleProxyAddress contract
         notary = new Notary(address(mockToken1), 3000);
+        WeightProvider weightProvider = new WeightProvider(
+            functionsOracleAddress,
+            address(notary),
+            address(mockToken1)
+        );
         coin = new Coin(address(notary));
         address router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
         address ROUTERV02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
         portfolio = new Portfolio(
             // router,
             ROUTERV02,
-            address(notary)
-        );
-
-        WeightProvider weightProvider = new WeightProvider(
-            functionsOracleAddress,
             address(notary),
-            address(mockToken1)
+            address(weightProvider)
         );
 
         notary.activate(address(coin), address(portfolio), address(weightProvider));
@@ -199,6 +198,7 @@ contract VaultTest is Test {
         assertEq(tokAmountVAfter, tokAmountUBefore);
     }
 
+    // This will fail, need to put high number for the RATIO to test this function
     function testliquidate() public {
         uint256 moreDebt = 100 * 1e18;
         address receiver = address(1);
@@ -219,7 +219,6 @@ contract VaultTest is Test {
         T.balanceCoin3VaultBefore = tokens[2].balanceOf(address(vault));
 
         notary.liquidateVaults();
-        // vault.liquidate(address(1));
 
         T.balanceCoinUserAfter = coin.balanceOf(receiver);
         T.balanceCoinNotaryAfter = coin.balanceOf(address(notary));
@@ -270,37 +269,4 @@ contract VaultTest is Test {
         assertEq(T.balanceCoin2NotaryAfter, 0);
         assertEq(T.balanceCoin3NotaryAfter / 100, collateralkept / 100);
     }
-
-    // function testcalculateTargetValues() public {
-    //     uint256 totalValueInDecimals = vault.TotalBalanceInDecimals();
-    //     uint256[] memory targetWeights = new uint256[](3);
-    //     targetWeights[0] = 30;
-    //     targetWeights[1] = 30;
-    //     targetWeights[2] = 40;
-
-    //     uint256[] memory returnV = new uint256[](3);
-    //     returnV = vault.portfolio().calculateTargetValues(
-    //         totalValueInDecimals,
-    //         targetWeights
-    //     );
-    //     console.log("we here");
-    //     console.log(returnV[0]);
-    //     console.log(returnV[1]);
-    //     console.log(returnV[2]);
-
-    //     address[] memory addressV = new address[](3);
-    //     addressV[0] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    //     addressV[1] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    //     addressV[2] = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-
-    //     IERC20[] memory tokenToSwap = new IERC20[](3);
-    //     uint256[] memory colAmounts = new uint256[](3);
-    //     address[] memory tokenToreceive = new address[](3);
-
-    //     (tokenToSwap, colAmounts, tokenToreceive) = vault
-    //         .portfolio()
-    //         .calculateAmountsToRebalance(vault, addressV, returnV);
-
-    //     // console.log(tokenToSwap[0]);
-    // }
 }
