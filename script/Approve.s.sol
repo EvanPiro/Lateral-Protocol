@@ -21,10 +21,7 @@ contract Approve is Script {
         IERC20 usdt = IERC20(0x6175a8471C2122f778445e7E07A164250a19E661);
         IERC20 dai = IERC20(0x7AF17A48a6336F7dc1beF9D485139f7B6f4FB5C8);
         IERC20 link = IERC20(0x779877A7B0D9E8603169DdbD7836e478b4624789);
-        usdt.approve(
-            0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008,
-            100 * 10 ** 18
-        );
+        usdt.approve(0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008, 100 * 10 ** 18);
         // usdt.approve(
         //     0xd0bBD6eD1f18D92e70Ca4A478F191f8150e8a536,
         //     100 * 10 ** 18

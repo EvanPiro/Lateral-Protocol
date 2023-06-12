@@ -50,7 +50,7 @@ async function fetchHistoricalData(asset) {
   const assetToLower = asset.toLowerCase();
 
   // CoinGecko API endpoint for historical data (max 90 days)
-  const url = `https://api.coingecko.com/api/v3/coins/${assetToLower}/market_chart?vs_currency=usd&days=365&interval=daily`;
+  const url = `https://api.coingecko.com/api/v3/coins/${assetToLower}/market_chart?vs_currency=usd&days=90&interval=daily`;
   const response = await axios.get(url);
 
   // The response is an object with two arrays: prices and market_caps.
@@ -88,7 +88,6 @@ async function getReturnsAndCovMatrix() {
 
   const covMatrix = cov(returns);
 
-  // Return both returns and covariance matrix
   return { returns, covMatrix };
 }
 
