@@ -5,23 +5,43 @@ var cov = require("compute-covariance");
 
 let portfolio = {
   tokens: {
-    GOLD: {
-      name: "Gold Token",
-      symbol: "bitcoin", // This is Bitcoin on CoinGecko
-      address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-      decimals: 8,
-      priceFeedAddress: "0x5fb1616F78dA7aFC9FF79e0371741a747D2a7F22",
+    BTC: {
+      name: "BTC",
+      symbol: "bitcoin",
+      address: "",
+      decimals: "",
+      priceFeedAddress: "",
     },
     FIAT: {
-      name: "USD",
+      name: "Tether",
+      symbol: "tether",
+      address: "",
+      decimals: "",
+      priceFeedAddress: "",
+    },
+    LinkToken: {
+      name: "LINK",
+      symbol: "chainlink",
+      address: "",
+      decimals: "",
+      priceFeedAddress: "",
+    },
+    ETH: {
+      name: "ETH",
       symbol: "ethereum", // This is ethereum on CoinGecko
-      address: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-      decimals: 18,
-      priceFeedAddress: "0x42585eD362B3f1BCa95c640FdFf35Ef899212734",
+      address: "",
+      decimals: "",
+      priceFeedAddress: "",
+    },
+    GOLD: {
+      name: "Gold Token",
+      symbol: "pax-gold",
+      address: "",
+      decimals: "",
+      priceFeedAddress: "",
     },
   },
 };
-
 
 let returns, covMatrix;
 
@@ -30,15 +50,15 @@ async function fetchHistoricalData(asset) {
   const assetToLower = asset.toLowerCase();
 
   // CoinGecko API endpoint for historical data (max 90 days)
-  const url = `https://api.coingecko.com/api/v3/coins/${assetToLower}/market_chart?vs_currency=usd&days=90`;
+  const url = `https://api.coingecko.com/api/v3/coins/${assetToLower}/market_chart?vs_currency=usd&days=90&interval=daily`;
   const response = await axios.get(url);
 
-  // The response is an object with two arrays: prices and market_caps. 
+  // The response is an object with two arrays: prices and market_caps.
   // We're interested in prices, where each entry is an array: [time, price].
   const prices = response.data.prices;
 
   // We only need the price, not the timestamp, so we map over the prices to get an array of only prices.
-  const closingPrices = prices.map(entry => entry[1]);
+  const closingPrices = prices.map((entry) => entry[1]);
 
   return closingPrices;
 }
@@ -54,20 +74,20 @@ async function getReturnsAndCovMatrix() {
     prices.push(historicalData);
   }
   // Trim all price arrays to the same length
-  prices = prices.map((assetPrices) => assetPrices.slice(0, minLen));
+  // prices = prices.map((assetPrices) => assetPrices.slice(0, minLen));
+
   const returns = prices.map((assetPrices) => {
     const assetReturns = [];
     for (let i = 1; i < assetPrices.length; i++) {
       const arithmeticReturn =
         (assetPrices[i] - assetPrices[i - 1]) / assetPrices[i - 1];
-      assetReturns.push(arithmeticReturn);
+      assetReturns.push(arithmeticReturn * Math.sqrt(252));
     }
     return assetReturns;
   });
 
   const covMatrix = cov(returns);
 
-  // Return both returns and covariance matrix
   return { returns, covMatrix };
 }
 
@@ -101,7 +121,6 @@ async function calculatePortfolio() {
     volArr[i] = Math.sqrt(
       mathjs.multiply(mathjs.multiply(weights, covMatrix), weights)
     );
-    // console.log(volArr[i]);
   }
 
   // Find the portfolio with the highest Sharpe Ratio
@@ -111,13 +130,16 @@ async function calculatePortfolio() {
   let maxSrReturns = retArr[maxSharpeIdx];
   let maxSrVolatility = volArr[maxSharpeIdx];
 
-  return allWeights[maxSharpeIdx][0] * 100;
+  return allWeights[maxSharpeIdx];
 }
 
 async function main() {
   const firstWeight = await calculatePortfolio();
-  console.log("First Token Weight:", firstWeight);
+  console.log("First Token Weight:", firstWeight[0] * 100);
+  console.log("Second Token Weight:", firstWeight[1] * 100);
+  console.log("Third Token Weight:", firstWeight[2] * 100);
+  console.log("Fourth Token Weight:", firstWeight[3] * 100);
+  console.log("Fifth Token Weight:", firstWeight[4] * 100);
 }
 
 main();
-

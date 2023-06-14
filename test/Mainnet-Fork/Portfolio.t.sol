@@ -38,27 +38,19 @@ contract UniV3Test is Test {
     IERC20 private paxg = IERC20(PAXG);
     IERC20 private link = IERC20(LINK);
 
-    AggregatorV3Interface private priceFeedEthUsd =
-        AggregatorV3Interface(ETHUSD);
-    AggregatorV3Interface private priceFeedDaiEth =
-        AggregatorV3Interface(DAIETH);
-    AggregatorV3Interface private priceFeedBtcEth =
-        AggregatorV3Interface(BTCETH);
-    AggregatorV3Interface private priceFeedUsdEth =
-        AggregatorV3Interface(USDCETH);
-    AggregatorV3Interface private priceFeedPaxGeth =
-        AggregatorV3Interface(PAXGETH);
-    AggregatorV3Interface private priceFeedLinkEth =
-        AggregatorV3Interface(LINKETH);
+    AggregatorV3Interface private priceFeedEthUsd = AggregatorV3Interface(ETHUSD);
+    AggregatorV3Interface private priceFeedDaiEth = AggregatorV3Interface(DAIETH);
+    AggregatorV3Interface private priceFeedBtcEth = AggregatorV3Interface(BTCETH);
+    AggregatorV3Interface private priceFeedUsdEth = AggregatorV3Interface(USDCETH);
+    AggregatorV3Interface private priceFeedPaxGeth = AggregatorV3Interface(PAXGETH);
+    AggregatorV3Interface private priceFeedLinkEth = AggregatorV3Interface(LINKETH);
 
-    address[] _assetsAddress = [PAXG, USDC, WBTC];
+    address[] _assetsAddress = [LINK, USDC, WBTC];
     uint256[] _targetWeights = [40, 40, 20];
-    uint8[] _decimals = [PAXGdecimals, USDCdecimals, WBTCdecimals];
-    AggregatorV3Interface[] _priceFeeds = [
-        priceFeedPaxGeth,
-        priceFeedUsdEth,
-        priceFeedBtcEth
-    ];
+    uint8[] _decimals = [LINKdecimals, USDCdecimals, WBTCdecimals];
+    AggregatorV3Interface[] _priceFeeds = [priceFeedLinkEth, priceFeedUsdEth, priceFeedBtcEth];
+
+    string[] _baseCurrencies = ["ETH", "ETH", "ETH"];
 
     uint256 public constant INITIAL_DEPOSIT = 100;
     uint256 public constant RATIO = 150;
@@ -68,6 +60,7 @@ contract UniV3Test is Test {
     uint256 public amountToMint2;
     uint256 public amountToMint3;
     Notary notary;
+    Portfolio portfolio;
 
     function setUp() public {
         vm.startPrank(address(1));
@@ -75,10 +68,18 @@ contract UniV3Test is Test {
         address functionsOracleAddress = address(111);
 
         // @Todo set up mock functionsOracleProxyAddress contract
-        notary = new Notary(RATIO);
+        notary = new Notary(WETH, 3000);
+        WeightProvider weightProvider = new WeightProvider(
+            functionsOracleAddress,
+            address(notary),
+            WETH
+        );
         Coin coin = new Coin(address(notary));
-        Portfolio portfolio = new Portfolio(ROUTERV02, address(notary));
-        WeightProvider weightProvider = new WeightProvider(functionsOracleAddress, address(notary));
+        portfolio = new Portfolio(
+            ROUTERV02,
+            address(notary),
+            address(weightProvider)
+        );
 
         notary.activate(address(coin), address(portfolio), address(weightProvider));
         vault = Vault(notary.openVault(ETHUSD));
@@ -96,26 +97,11 @@ contract UniV3Test is Test {
         dai.approve(address(vault), amountToMint2);
         link.approve(address(vault), amountToMint3);
 
-        vault.addOneCollateral(
-            address(weth),
-            amountToMint1,
-            WETHdecimals,
-            priceFeedEthUsd
-        );
-        vault.addOneCollateral(
-            address(dai),
-            amountToMint2,
-            DAIdecimals,
-            priceFeedDaiEth
-        );
-        vault.addOneCollateral(
-            address(link),
-            amountToMint3,
-            LINKdecimals,
-            priceFeedLinkEth
-        );
+        vault.addOneCollateral(address(weth), amountToMint1, WETHdecimals, address(priceFeedEthUsd), "USD");
+        vault.addOneCollateral(address(dai), amountToMint2, DAIdecimals, address(priceFeedDaiEth), "ETH");
+        vault.addOneCollateral(address(link), amountToMint3, LINKdecimals, address(priceFeedLinkEth), "ETH");
 
-        vault.updateStrategy(2);
+        vault.updateStrategy(1);
 
         // portfolio.updateAssets(
         //     _assetsAddress,
@@ -126,14 +112,8 @@ contract UniV3Test is Test {
     }
 
     function testupdateCollateralPortfolio() public {
-        notary.updateAssetsAndPortfolio(
-            _assetsAddress,
-            _targetWeights,
-            _decimals,
-            _priceFeeds,
-            WETH,
-            3000
-        );
+        portfolio.updateAssets(_assetsAddress, _targetWeights, _decimals, _priceFeeds, _baseCurrencies);
+        notary.updatePortfolio();
         address receiver = address(1);
         // vault.updateCollateralPortfolio(WETH, 3000);
         console.log(address(vault.getTokens(receiver)[0]));
@@ -152,11 +132,35 @@ contract UniV3Test is Test {
         console.log(vault.getAmounts(vault.getTokens(receiver)[2], receiver));
         console.log(vault.getDecimals(vault.getTokens(receiver)[2], receiver));
 
-        console.log("------");
-        console.log(address(vault.getTokens(receiver)[3]));
-        console.log(vault.getWeights(vault.getTokens(receiver)[3], receiver));
-        console.log(vault.getAmounts(vault.getTokens(receiver)[3], receiver));
-        console.log(vault.getDecimals(vault.getTokens(receiver)[3], receiver));
+        vault.updateStrategy(2);
+        notary.updatePortfolio();
+        console.log(IERC20(WETH).balanceOf(address(vault)));
+        console.log(IERC20(WETH).balanceOf(address(1)));
+
+        // vault.updateCollateralPortfolio(WETH, 3000);
+        console.log(address(vault.getTokens(receiver)[0]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[0], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[0], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[0], receiver));
+        //console.log(vault.getPriceFeeds(vault.getTokens()[0]));
+        console.log("--");
+        console.log(address(vault.getTokens(receiver)[1]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[1], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[1], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[1], receiver));
+        console.log("--");
+        console.log(address(vault.getTokens(receiver)[2]));
+        console.log(vault.getWeights(vault.getTokens(receiver)[2], receiver));
+        console.log(vault.getAmounts(vault.getTokens(receiver)[2], receiver));
+        console.log(vault.getDecimals(vault.getTokens(receiver)[2], receiver));
+
+        vault.RetrieveAll();
+
+        // console.log("------");
+        // console.log(address(vault.getTokens(receiver)[3]));
+        // console.log(vault.getWeights(vault.getTokens(receiver)[3], receiver));
+        // console.log(vault.getAmounts(vault.getTokens(receiver)[3], receiver));
+        // console.log(vault.getDecimals(vault.getTokens(receiver)[3], receiver));
 
         // console.log("------");
         // console.log(address(vault.getTokens()[4]));
